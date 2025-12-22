@@ -1,0 +1,7 @@
+{
+  "name": "Azmeer AI Studio",
+  "description": "Platform penjanaan video berkuasa tinggi melalui kluster Azmeer AI Studio UAPI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
