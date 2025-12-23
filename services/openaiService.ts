@@ -1,30 +1,21 @@
 
 /**
  * PENGESANAN API KEY OPENAI (Vercel & Vite Optimized)
- * PENTING: Vite memerlukan akses literal 'import.meta.env.VITE_KEY' untuk 
- * menggantikan nilai semasa build. Optional chaining (?.) kadangkala 
- * menyebabkan kegagalan penggantian statik.
  */
-
 const getApiKey = (): string => {
   try {
-    // 1. Cuba akses standard Vite (Static Replacement Target)
+    // Akses literal untuk Vite static replacement
     // @ts-ignore
-    const viteKey = import.meta.env.VITE_OPENAI_API_KEY;
+    const viteKey = import.meta.env ? import.meta.env.VITE_OPENAI_API_KEY : null;
     if (viteKey) return viteKey;
 
-    // 2. Cuba akses melalui objek env (Dynamic Fallback)
-    // @ts-ignore
-    const envObj = (import.meta && import.meta.env) ? import.meta.env : {};
-    if (envObj.VITE_OPENAI_API_KEY) return envObj.VITE_OPENAI_API_KEY;
-
-    // 3. Cuba akses process.env (Server-side/Legacy Fallback)
+    // Fallback untuk persekitaran lain
     // @ts-ignore
     if (typeof process !== 'undefined' && process.env && process.env.VITE_OPENAI_API_KEY) {
       return process.env.VITE_OPENAI_API_KEY;
     }
   } catch (e) {
-    console.warn("Security policy prevented direct environment access.");
+    console.warn("Environment access restricted.");
   }
   return "";
 };
@@ -32,7 +23,7 @@ const getApiKey = (): string => {
 const OPENAI_API_KEY = getApiKey().trim();
 
 /**
- * Proxy Wrapper untuk mengelakkan sekatan CORS di pelayar
+ * Proxy Wrapper untuk mengelakkan sekatan CORS
  */
 const proxiedFetch = async (url: string, options: RequestInit) => {
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
@@ -40,11 +31,11 @@ const proxiedFetch = async (url: string, options: RequestInit) => {
 };
 
 /**
- * Refinement Prompt menggunakan GPT-4o mini
+ * Refinement Prompt menggunakan OpenAI GPT-4o-mini
  */
 export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
-    console.warn("OpenAI Key missing from build metadata.");
+    console.warn("OpenAI API Key is missing. Returning original text.");
     return text;
   }
 
@@ -70,7 +61,7 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
 
     const data = await response.json();
     if (data.error) {
-      console.error("OpenAI API Error:", data.error.message);
+      console.error("OpenAI Error:", data.error.message);
       return text;
     }
     return data.choices?.[0]?.message?.content?.trim() || text;
@@ -81,11 +72,11 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
 };
 
 /**
- * Penjana UGC Specialist menggunakan GPT-4o mini
+ * Penjana UGC Specialist menggunakan OpenAI GPT-4o-mini
  */
 export const generateUGCPrompt = async (idea: string, platform: 'tiktok' | 'facebook'): Promise<string> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
-    throw new Error(`PENGESAHAN GAGAL: Kunci API OpenAI tidak dikesan dalam 'build environment'. Sila pastikan VITE_OPENAI_API_KEY telah ditambah di Vercel Settings dan anda telah melakukan REDEPLOY dengan mematikan (uncheck) 'Use existing build cache'.`);
+    throw new Error(`PENGESAHAN GAGAL: Kunci API OpenAI tidak dikesan. Sila pastikan VITE_OPENAI_API_KEY telah ditambah di Vercel Settings dan lakukan REDEPLOY.`);
   }
 
   const systemPrompt = `You are a professional UGC (User Generated Content) Video Engineer for Sora 2 AI. 
