@@ -1,7 +1,7 @@
 
 export type AspectRatio = '16:9' | '9:16' | '1:1';
 export type Resolution = '720p' | '1080p';
-export type EngineType = 'SORA' | 'ARCHIVE' | 'GEMINI' | 'ADMIN';
+export type EngineType = 'SORA' | 'ARCHIVE' | 'ADMIN';
 
 export interface User {
   id: string;
