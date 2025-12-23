@@ -99,13 +99,13 @@ export default function App() {
   useEffect(() => {
     if (user) {
       db.getUuids(user.id).then(res => {
-        if (res) {
+        if (res && res.length > 0) {
           setRemoteUuids(res);
           localStorage.setItem(`uuids_${user.id}`, JSON.stringify(res));
         }
       });
     }
-  }, [user, state.history]);
+  }, [user]);
 
   const filteredHistory = useMemo(() => {
     const now = Date.now();
@@ -125,13 +125,13 @@ export default function App() {
   }, [state.history, archiveFilter, user, remoteUuids]);
 
   const updateUserQuota = async (updatedUser: User) => {
-    // Save locally
+    // 1. Save Locally for instant feedback
     const registry = JSON.parse(localStorage.getItem('azmeer_global_registry') || '[]');
     const newRegistry = registry.map((u: User) => u.id === updatedUser.id ? updatedUser : u);
     localStorage.setItem('azmeer_global_registry', JSON.stringify(newRegistry));
     setAllUsers(newRegistry);
     
-    // Save to Cloud (Supabase)
+    // 2. Save to Cloud (Supabase) - We await this to ensure persistence
     if (updatedUser.password) {
       await db.saveUser(updatedUser.username, updatedUser.password, updatedUser);
     }
@@ -195,12 +195,13 @@ export default function App() {
         myUuids.push(uuid);
         localStorage.setItem(`uuids_${user.id}`, JSON.stringify(myUuids));
         
-        // Cloud Save
+        // Cloud Save - Await here so it doesn't get lost on refresh
         await db.saveUuid(user.id, uuid);
 
         optimisticUuids.current.add(uuid);
         const updatedUser = { ...user, credits: user.role === 'admin' ? user.credits : user.credits - 10, videosGenerated: user.videosGenerated + 1 };
-        updateUserQuota(updatedUser);
+        await updateUserQuota(updatedUser); // Ensure quota is synced
+        
         const optimisticItem: GeneratedVideo = { mediaType: 'video', uuid: uuid, url: '', prompt: prompt, timestamp: Date.now(), status: 1, status_percentage: result.status_percentage || 1, aspectRatio: aspectRatio, model_name: 'Sora 2', duration: duration };
         setState(p => ({ ...p, isGenerating: false, activeTab: 'ARCHIVE', history: [optimisticItem, ...p.history], success: "Penjanaan Dimulakan! Sila tunggu rendering selesai." }));
       }

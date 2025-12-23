@@ -1,20 +1,20 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
 
-# Run and deploy your AI Studio app
+# 🚀 Azmeer AI Studio - GitHub & Security Guide
 
-This contains everything you need to run your app locally.
+## 1. Cara "Save" ke GitHub
+Jika anda tidak dapat "save" terus, ini adalah kerana persekitaran web ini tidak mempunyai akses tulis (write access) ke akaun GitHub anda secara automatik.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1pS9TvkxL5U3d4SFPNSUj0XQA-i1fzesJ
+**Langkah Manual:**
+1. Klik butang **Download Project** (ikon anak panah bawah) di bahagian atas kanan editor.
+2. Ekstrak fail .zip tersebut di komputer anda.
+3. Pergi ke akaun [GitHub](https://github.com/) anda.
+4. Bina satu **New Repository** (Set sebagai **Private**).
+5. Guna butang **"Upload files"** dan tarik semua fail tadi ke dalam GitHub.
 
-## Run Locally
+## 2. Keselamatan API Key
+Semua kunci API OpenAI telah dibuang daripada kod sumber. Untuk menggunakan semula fungsi AI:
+- Masukkan kunci anda dalam **Environment Variables** di platform hosting (seperti Vercel, Netlify, atau Replit).
+- Nama variable: `OPENAI_API_KEY`.
 
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 3. Penyimpanan Data
+Data user dan history video anda **automatik tersimpan** dalam **Supabase**. Anda tidak perlu save ke GitHub untuk simpan data user; GitHub hanya untuk simpan kod sahaja.
