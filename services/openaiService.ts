@@ -1,20 +1,35 @@
 
-// Safe access to process.env for Vite/Vercel production
+// Fungsi untuk mengesan API Key daripada pelbagai punca persekitaran
 const getOpenAiKey = () => {
   try {
-    // Priority 1: Vercel/System Environment Variables (VITE_ prefix is recommended for Vite/Vercel client-side)
-    const envKey = 
-      (import.meta as any).env?.VITE_OPENAI_API_KEY ||
-      (import.meta as any).env?.OPENAI_API_KEY ||
-      (typeof process !== 'undefined' ? process.env?.OPENAI_API_KEY : null);
-
-    if (envKey && envKey.trim().length > 10) {
-      return envKey.trim();
+    // 1. Akses literal untuk Vite (Paling penting untuk Vercel Deployment)
+    // Vite memerlukan nama penuh 'import.meta.env.VITE_...' untuk menggantikan nilai semasa build.
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_OPENAI_API_KEY) {
+      // @ts-ignore
+      return import.meta.env.VITE_OPENAI_API_KEY.trim();
     }
 
-    // No hardcoded fallback to ensure GitHub "Save" functionality works without being blocked by Secret Scanning
+    // 2. Fallback kepada nama tanpa prefix VITE_
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.OPENAI_API_KEY) {
+      // @ts-ignore
+      return import.meta.env.OPENAI_API_KEY.trim();
+    }
+
+    // 3. Fallback kepada process.env (Untuk persekitaran Node/SSR atau suntikan Vercel tertentu)
+    if (typeof process !== 'undefined' && process.env) {
+      const vKey = process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+      if (vKey) return vKey.trim();
+    }
+
+    // 4. Semakan dinamik sebagai usaha terakhir
+    const meta = import.meta as any;
+    if (meta.env && meta.env.VITE_OPENAI_API_KEY) return meta.env.VITE_OPENAI_API_KEY.trim();
+
     return null;
   } catch (e) {
+    console.error("Error detecting API Key:", e);
     return null;
   }
 };
@@ -22,7 +37,7 @@ const getOpenAiKey = () => {
 const OPENAI_API_KEY = getOpenAiKey();
 
 /**
- * Proxy Wrapper to bypass browser CORS restrictions (Failed to fetch error)
+ * Proxy Wrapper untuk mengelakkan sekatan CORS di pelayar
  */
 const proxiedFetch = async (url: string, options: RequestInit) => {
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
@@ -30,11 +45,11 @@ const proxiedFetch = async (url: string, options: RequestInit) => {
 };
 
 /**
- * General Prompt Refinement using GPT-4o mini
+ * Refinement Prompt menggunakan GPT-4o mini
  */
 export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
   if (!OPENAI_API_KEY) {
-    console.warn("OPENAI_API_KEY tidak dijumpai dalam Environment Variables. Menggunakan teks asal.");
+    console.warn("OPENAI_API_KEY tidak dikesan. Sila REDEPLOY projek anda di Vercel selepas menambah Environment Variable.");
     return text;
   }
 
@@ -71,15 +86,13 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
 };
 
 /**
- * UGC Specialist Generator using GPT-4o mini
+ * Penjana UGC Specialist menggunakan GPT-4o mini
  */
 export const generateUGCPrompt = async (idea: string, platform: 'tiktok' | 'facebook'): Promise<string> => {
   if (!OPENAI_API_KEY) {
-    throw new Error("Sila masukkan OPENAI_API_KEY dalam Vercel Environment Variables untuk menggunakan fungsi UGC.");
+    throw new Error("Sila REDEPLOY (Deploy semula) projek anda di dashboard Vercel untuk mengaktifkan kunci API yang baru ditambah.");
   }
 
-  const ctaText = platform === 'tiktok' ? 'tekan beg kuning sekarang' : 'tekan learn more untuk tahu lebih lanjut';
-  
   const systemPrompt = `You are a professional UGC (User Generated Content) Video Engineer for Sora 2 AI. 
   Your goal is to create a highly detailed 15-second technical video prompt in ENGLISH.
   

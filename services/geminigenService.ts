@@ -5,15 +5,6 @@ import { GoogleGenAI } from "@google/genai";
 const GEMINIGEN_API_KEY = "tts-fe8bac4d9a7681f6193dbedb69313c2d";
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
-// Safe access to process.env for Vite production
-const getApiKey = () => {
-  try {
-    return (typeof process !== 'undefined' ? process.env?.API_KEY : null) || (import.meta as any).env?.VITE_API_KEY || "";
-  } catch (e) {
-    return "";
-  }
-};
-
 /**
  * DIVERSIFIED PROXY CLUSTER
  */
@@ -28,8 +19,12 @@ const PROXY_NODES = [
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const getShuffledProxies = () => [...PROXY_NODES].sort(() => Math.random() - 0.5);
 
+/**
+ * Gemini Prompt Refinement
+ * Uses process.env.API_KEY as per system requirements.
+ */
 export const refinePromptWithAI = async (text: string): Promise<string> => {
-  const apiKey = getApiKey();
+  const apiKey = process.env.API_KEY;
   if (!apiKey) return text;
 
   try {
@@ -39,7 +34,7 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
       contents: `Act as a cinematic prompt engineer. Transform this basic idea into a highly detailed, visually descriptive prompt for Sora AI (approx 40 words): "${text}". Return ONLY the refined prompt text.`,
       config: { temperature: 0.7 }
     });
-    return response.text?.trim() || text;
+    return response.text || text;
   } catch (error) {
     console.error("Gemini Error:", error);
     return text;
