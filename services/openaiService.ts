@@ -1,40 +1,18 @@
 
-// Fungsi untuk mengesan API Key daripada pelbagai punca persekitaran
-const getOpenAiKey = () => {
-  try {
-    // 1. Akses literal untuk Vite (Paling penting untuk Vercel Deployment)
-    // Vite memerlukan nama penuh 'import.meta.env.VITE_...' untuk menggantikan nilai semasa build.
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_OPENAI_API_KEY) {
-      // @ts-ignore
-      return import.meta.env.VITE_OPENAI_API_KEY.trim();
-    }
+/**
+ * PENGESANAN API KEY OPENAI (Vercel & Vite Optimized)
+ * Kod ini menggunakan akses literal yang diperlukan oleh Vite untuk menyuntik 
+ * nilai persekitaran semasa proses 'Build'.
+ */
 
-    // 2. Fallback kepada nama tanpa prefix VITE_
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.OPENAI_API_KEY) {
-      // @ts-ignore
-      return import.meta.env.OPENAI_API_KEY.trim();
-    }
+// @ts-ignore
+const VITE_ENV_KEY = import.meta.env?.VITE_OPENAI_API_KEY;
+// @ts-ignore
+const PLAIN_ENV_KEY = import.meta.env?.OPENAI_API_KEY;
+const PROCESS_ENV_KEY = typeof process !== 'undefined' ? (process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY) : null;
 
-    // 3. Fallback kepada process.env (Untuk persekitaran Node/SSR atau suntikan Vercel tertentu)
-    if (typeof process !== 'undefined' && process.env) {
-      const vKey = process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-      if (vKey) return vKey.trim();
-    }
-
-    // 4. Semakan dinamik sebagai usaha terakhir
-    const meta = import.meta as any;
-    if (meta.env && meta.env.VITE_OPENAI_API_KEY) return meta.env.VITE_OPENAI_API_KEY.trim();
-
-    return null;
-  } catch (e) {
-    console.error("Error detecting API Key:", e);
-    return null;
-  }
-};
-
-const OPENAI_API_KEY = getOpenAiKey();
+// Gabungkan semua punca dan buang ruang kosong (trim)
+const OPENAI_API_KEY = (VITE_ENV_KEY || PLAIN_ENV_KEY || PROCESS_ENV_KEY || "").trim();
 
 /**
  * Proxy Wrapper untuk mengelakkan sekatan CORS di pelayar
@@ -48,8 +26,8 @@ const proxiedFetch = async (url: string, options: RequestInit) => {
  * Refinement Prompt menggunakan GPT-4o mini
  */
 export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
-  if (!OPENAI_API_KEY) {
-    console.warn("OPENAI_API_KEY tidak dikesan. Sila REDEPLOY projek anda di Vercel selepas menambah Environment Variable.");
+  if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
+    console.warn("API_KEY_MISSING: Menggunakan prompt asal.");
     return text;
   }
 
@@ -89,8 +67,8 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
  * Penjana UGC Specialist menggunakan GPT-4o mini
  */
 export const generateUGCPrompt = async (idea: string, platform: 'tiktok' | 'facebook'): Promise<string> => {
-  if (!OPENAI_API_KEY) {
-    throw new Error("Sila REDEPLOY (Deploy semula) projek anda di dashboard Vercel untuk mengaktifkan kunci API yang baru ditambah.");
+  if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
+    throw new Error("Kunci API OpenAI tidak dikesan. Sila pastikan VITE_OPENAI_API_KEY telah ditambah di Vercel Settings dan anda telah melakukan REDEPLOY (tanpa cache).");
   }
 
   const systemPrompt = `You are a professional UGC (User Generated Content) Video Engineer for Sora 2 AI. 
