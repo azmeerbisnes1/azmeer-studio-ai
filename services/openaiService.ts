@@ -1,6 +1,14 @@
 
-// Kunci API kini ditarik dari persekitaran (Environment Variables) untuk keselamatan
-const OPENAI_API_KEY = (window as any).process?.env?.OPENAI_API_KEY || "";
+// Safe access to process.env for Vite production
+const getOpenAiKey = () => {
+  try {
+    return (typeof process !== 'undefined' ? process.env?.OPENAI_API_KEY : null) || (import.meta as any).env?.VITE_OPENAI_API_KEY || "";
+  } catch (e) {
+    return "";
+  }
+};
+
+const OPENAI_API_KEY = getOpenAiKey();
 
 /**
  * General Prompt Refinement using GPT-4o mini
@@ -32,7 +40,7 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
     });
 
     const data = await response.json();
-    return data.choices[0].message.content.trim();
+    return data.choices?.[0]?.message?.content?.trim() || text;
   } catch (error) {
     console.error("OpenAI Refine Error:", error);
     return text;
@@ -88,7 +96,7 @@ export const generateUGCPrompt = async (idea: string, platform: 'tiktok' | 'face
 
     const data = await response.json();
     if (data.error) throw new Error(data.error.message);
-    return data.choices[0].message.content.trim();
+    return data.choices?.[0]?.message?.content?.trim() || "";
   } catch (error: any) {
     console.error("OpenAI UGC Error:", error);
     throw new Error(`Ralat OpenAI: ${error.message}`);

@@ -1,8 +1,15 @@
 
-// Mengambil API Key daripada Environment Variables platform hosting (Vercel/Netlify)
-// Jika tiada, ia akan cuba ambil dari window process (Local dev)
-const SUPABASE_URL = (window as any).process?.env?.SUPABASE_URL || (import.meta as any).env?.VITE_SUPABASE_URL || "";
-const SUPABASE_ANON_KEY = (window as any).process?.env?.SUPABASE_ANON_KEY || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
+const getSupabaseConfig = () => {
+  try {
+    const url = (typeof process !== 'undefined' ? process.env?.SUPABASE_URL : null) || (import.meta as any).env?.VITE_SUPABASE_URL || "";
+    const key = (typeof process !== 'undefined' ? process.env?.SUPABASE_ANON_KEY : null) || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
+    return { url, key };
+  } catch (e) {
+    return { url: "", key: "" };
+  }
+};
+
+const { url: SUPABASE_URL, key: SUPABASE_ANON_KEY } = getSupabaseConfig();
 
 /**
  * Helper untuk fetch dari Supabase REST API.

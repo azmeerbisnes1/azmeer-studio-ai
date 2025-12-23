@@ -5,9 +5,17 @@ import { GoogleGenAI } from "@google/genai";
 const GEMINIGEN_API_KEY = "tts-fe8bac4d9a7681f6193dbedb69313c2d";
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
+// Safe access to process.env for Vite production
+const getApiKey = () => {
+  try {
+    return (typeof process !== 'undefined' ? process.env?.API_KEY : null) || (import.meta as any).env?.VITE_API_KEY || "";
+  } catch (e) {
+    return "";
+  }
+};
+
 /**
  * DIVERSIFIED PROXY CLUSTER
- * Randomized selection to prevent rate-limiting.
  */
 const PROXY_NODES = [
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
@@ -18,13 +26,14 @@ const PROXY_NODES = [
 ];
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Helper to shuffle proxies so we don't hit the same one first every time
 const getShuffledProxies = () => [...PROXY_NODES].sort(() => Math.random() - 0.5);
 
 export const refinePromptWithAI = async (text: string): Promise<string> => {
+  const apiKey = getApiKey();
+  if (!apiKey) return text;
+
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Act as a cinematic prompt engineer. Transform this basic idea into a highly detailed, visually descriptive prompt for Sora AI (approx 40 words): "${text}". Return ONLY the refined prompt text.`,
@@ -42,7 +51,6 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
  */
 export async function uapiFetch(endpoint: string, options: RequestInit = {}, retryCount = 0): Promise<any> {
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  // Use a stable timestamp for 5 seconds to allow some caching but prevent stale data
   const targetUrl = `${BASE_URL}${path}${path.includes('?') ? '&' : '?'}_nocache=${Math.floor(Date.now() / 5000)}`;
 
   const headers = {
@@ -59,7 +67,7 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}, ret
     try {
       const proxiedUrl = proxyFn(targetUrl);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const response = await fetch(proxiedUrl, { 
         ...options, 
@@ -80,12 +88,10 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}, ret
     } catch (error: any) {
       lastError = error;
       if (error.message === "AUTH_FAIL") break;
-      // If it's a "Failed to fetch" (CORS/Network), try the next proxy immediately
       continue; 
     }
   }
 
-  // Final retry with a longer wait
   if (retryCount < 1) {
     await wait(1500);
     return uapiFetch(endpoint, options, retryCount + 1);
@@ -103,12 +109,8 @@ export const getSpecificHistory = async (uuid: string) => {
   }
 };
 
-/**
- * Normalize URLs safely preserving all signed query parameters.
- */
 export const normalizeUrl = (url: any, type: 'video' | 'image' | 'audio', uuid?: string): string => {
   if (url && typeof url === 'string' && url.startsWith('http')) {
-    // Clean only escaped slashes, preserve query string perfectly
     let clean = url.replace(/\\/g, '').trim();
     if (clean.startsWith('http://')) clean = clean.replace('http://', 'https://');
     return clean;
@@ -134,7 +136,6 @@ export const getHistory = async (): Promise<HistoryItem[]> => {
       let percentage = Number(item.status_percentage) || 0;
       let finalUrl = item.generate_result || item.video_url || item.image_url || "";
 
-      // Pastikan CreatedAt ada zon masa UTC jika tiada, untuk elak ralat pengiraan 3 jam
       let rawDateStr = item.created_at;
       if (rawDateStr && !rawDateStr.includes('Z') && !rawDateStr.includes('+')) {
         rawDateStr += 'Z';
