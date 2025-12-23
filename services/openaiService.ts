@@ -1,14 +1,35 @@
 
 /**
  * PENGESANAN API KEY OPENAI (Vercel & Vite Optimized)
- * PENTING: Vite melakukan 'static replacement'. Kod ini menggunakan 
- * optional chaining untuk mengelakkan ralat 'undefined' semasa runtime
- * jika objek env belum sedia.
+ * PENTING: Vite memerlukan akses literal 'import.meta.env.VITE_KEY' untuk 
+ * menggantikan nilai semasa build. Optional chaining (?.) kadangkala 
+ * menyebabkan kegagalan penggantian statik.
  */
 
-// Akses selamat menggunakan optional chaining agar tidak crash jika import.meta.env tiada
-// @ts-ignore
-const OPENAI_API_KEY = (import.meta?.env?.VITE_OPENAI_API_KEY || "").trim();
+const getApiKey = (): string => {
+  try {
+    // 1. Cuba akses standard Vite (Static Replacement Target)
+    // @ts-ignore
+    const viteKey = import.meta.env.VITE_OPENAI_API_KEY;
+    if (viteKey) return viteKey;
+
+    // 2. Cuba akses melalui objek env (Dynamic Fallback)
+    // @ts-ignore
+    const envObj = (import.meta && import.meta.env) ? import.meta.env : {};
+    if (envObj.VITE_OPENAI_API_KEY) return envObj.VITE_OPENAI_API_KEY;
+
+    // 3. Cuba akses process.env (Server-side/Legacy Fallback)
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env && process.env.VITE_OPENAI_API_KEY) {
+      return process.env.VITE_OPENAI_API_KEY;
+    }
+  } catch (e) {
+    console.warn("Security policy prevented direct environment access.");
+  }
+  return "";
+};
+
+const OPENAI_API_KEY = getApiKey().trim();
 
 /**
  * Proxy Wrapper untuk mengelakkan sekatan CORS di pelayar
@@ -22,7 +43,6 @@ const proxiedFetch = async (url: string, options: RequestInit) => {
  * Refinement Prompt menggunakan GPT-4o mini
  */
 export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
-  // Jika kunci tiada, pulangkan prompt asal tanpa ralat yang menyekat UI
   if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
     console.warn("OpenAI Key missing from build metadata.");
     return text;
