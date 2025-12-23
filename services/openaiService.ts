@@ -1,18 +1,19 @@
 
 /**
  * PENGESANAN API KEY OPENAI (Vercel & Vite Optimized)
- * Kod ini menggunakan akses literal yang diperlukan oleh Vite untuk menyuntik 
- * nilai persekitaran semasa proses 'Build'.
+ * Menggunakan pendekatan defensif untuk mengelakkan ralat 'undefined' semasa runtime.
  */
 
+// Akses selamat menggunakan pengecekan jenis dan optional chaining
 // @ts-ignore
-const VITE_ENV_KEY = import.meta.env?.VITE_OPENAI_API_KEY;
-// @ts-ignore
-const PLAIN_ENV_KEY = import.meta.env?.OPENAI_API_KEY;
-const PROCESS_ENV_KEY = typeof process !== 'undefined' ? (process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY) : null;
+const VITE_KEY = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env.VITE_OPENAI_API_KEY : undefined;
 
-// Gabungkan semua punca dan buang ruang kosong (trim)
-const OPENAI_API_KEY = (VITE_ENV_KEY || PLAIN_ENV_KEY || PROCESS_ENV_KEY || "").trim();
+// Fallback untuk persekitaran process (Node.js/Vercel legacy)
+// @ts-ignore
+const PROCESS_KEY = (typeof process !== 'undefined' && process.env) ? (process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY) : undefined;
+
+// Gabungkan dan bersihkan
+const OPENAI_API_KEY = (VITE_KEY || PROCESS_KEY || "").trim();
 
 /**
  * Proxy Wrapper untuk mengelakkan sekatan CORS di pelayar
@@ -26,8 +27,9 @@ const proxiedFetch = async (url: string, options: RequestInit) => {
  * Refinement Prompt menggunakan GPT-4o mini
  */
 export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
+  // Jika kunci terlalu pendek atau tiada, pulangkan prompt asal tanpa ralat besar
   if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
-    console.warn("API_KEY_MISSING: Menggunakan prompt asal.");
+    console.warn("OpenAI Key missing. Skipping refinement.");
     return text;
   }
 
@@ -68,7 +70,7 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
  */
 export const generateUGCPrompt = async (idea: string, platform: 'tiktok' | 'facebook'): Promise<string> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
-    throw new Error("Kunci API OpenAI tidak dikesan. Sila pastikan VITE_OPENAI_API_KEY telah ditambah di Vercel Settings dan anda telah melakukan REDEPLOY (tanpa cache).");
+    throw new Error("PENGESAHAN GAGAL: Kunci API OpenAI (VITE_OPENAI_API_KEY) tidak dijumpai. Sila pastikan anda telah menambah variable ini di Vercel Dashboard dan melakukan 'Redeploy' dengan pilihan 'Use existing build cache' DIMATIKAN.");
   }
 
   const systemPrompt = `You are a professional UGC (User Generated Content) Video Engineer for Sora 2 AI. 
