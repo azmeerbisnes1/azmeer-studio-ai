@@ -1,30 +1,38 @@
 
 /**
- * PENGESANAN API KEY OPENAI (Vercel & Vite Optimized)
- * Menggunakan akses literal untuk memastikan Vite melakukan static replacement dengan tepat.
+ * PENGESANAN API KEY OPENAI (Manual & Environment)
  */
 const getApiKey = (): string => {
   let key = "";
   try {
-    // Vite mencari string literal ini semasa build time. 
-    // Jangan gunakan optional chaining atau pembolehubah dinamik di sini.
-    // @ts-ignore
-    key = import.meta.env.VITE_OPENAI_API_KEY || "";
-    
-    // Fallback untuk persekitaran Node/Server-side jika diperlukan
-    if (!key && typeof process !== 'undefined' && process.env) {
-      key = process.env.VITE_OPENAI_API_KEY || "";
+    // 1. UTAMA: Ambil daripada input manual user di UI (localStorage)
+    const manualKey = localStorage.getItem('azmeer_manual_openai_key');
+    if (manualKey && manualKey.length > 10) {
+      key = manualKey.trim();
+    } else {
+      // 2. FALLBACK: Ambil daripada Vite build-time env
+      // @ts-ignore
+      key = (import.meta.env.VITE_OPENAI_API_KEY || "").trim();
+      
+      // 3. FALLBACK: Ambil daripada process.env
+      if (!key && typeof process !== 'undefined' && process.env) {
+        key = (process.env.VITE_OPENAI_API_KEY || "").trim();
+      }
     }
   } catch (e) {
     console.warn("Environment access restricted.");
   }
   
-  // CUCI KUNCI: Buang ruang kosong dan buang tanda petikan (" atau ') 
-  // yang sering tersilap masuk semasa copy-paste ke Vercel.
-  return key.trim().replace(/^["'](.+)["']$/, '$1');
-};
+  // CUCI KUNCI: Buang tanda petikan (" atau ') dan ruang kosong
+  const cleanedKey = key.replace(/^["'](.+)["']$/, '$1').trim();
 
-const OPENAI_API_KEY = getApiKey();
+  // VALIDASI: Jika kunci mengandungi banyak bintang, bermakna user tersalin kunci 'masked'
+  if (cleanedKey.includes('****')) {
+    throw new Error("KUNCI API TIDAK SAH: Anda nampaknya menyalin kunci yang 'dihijab' (masked) dengan simbol bintang dari dashboard OpenAI. Sila salin kunci penuh (klik butang 'Copy' atau buat kunci baru).");
+  }
+
+  return cleanedKey;
+};
 
 /**
  * Proxy Wrapper untuk mengelakkan sekatan CORS
@@ -38,9 +46,15 @@ const proxiedFetch = async (url: string, options: RequestInit) => {
  * Refinement Prompt menggunakan OpenAI GPT-4o-mini
  */
 export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
-  if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
-    console.warn("OpenAI API Key is missing or too short.");
-    return text;
+  let currentKey = "";
+  try {
+    currentKey = getApiKey();
+  } catch (err: any) {
+    throw err;
+  }
+
+  if (!currentKey || currentKey.length < 10) {
+    throw new Error("KUNCI API DIPERLUKAN: Sila masukkan OpenAI API Key yang sah dalam ruangan 'OpenAI Key Terminal' di atas.");
   }
 
   try {
@@ -48,7 +62,7 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENAI_API_KEY}`
+        "Authorization": `Bearer ${currentKey}`
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
@@ -65,13 +79,16 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
 
     const data = await response.json();
     if (data.error) {
-      console.error("OpenAI API Error Details:", data.error);
-      return text;
+      // Jika OpenAI pulangkan ralat key, beri mesej yang lebih jelas
+      if (data.error.code === 'invalid_api_key' || data.error.message.includes('Incorrect API key')) {
+        throw new Error("RALAT KUNCI API: OpenAI tidak menerima kunci ini. Sila pastikan kunci adalah penuh, aktif, dan mempunyai kredit.");
+      }
+      throw new Error(data.error.message);
     }
     return data.choices?.[0]?.message?.content?.trim() || text;
   } catch (error: any) {
-    console.error("OpenAI Connection Error:", error);
-    return text;
+    console.error("OpenAI Refine Error:", error);
+    throw error;
   }
 };
 
@@ -79,8 +96,15 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
  * Penjana UGC Specialist menggunakan OpenAI GPT-4o-mini
  */
 export const generateUGCPrompt = async (idea: string, platform: 'tiktok' | 'facebook'): Promise<string> => {
-  if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
-    throw new Error(`KUNCI API TIDAK SAH: Sila pastikan VITE_OPENAI_API_KEY telah ditambah di Vercel/Hosting anda tanpa tanda petikan.`);
+  let currentKey = "";
+  try {
+    currentKey = getApiKey();
+  } catch (err: any) {
+    throw err;
+  }
+
+  if (!currentKey || currentKey.length < 10) {
+    throw new Error("KUNCI API DIPERLUKAN: Sila masukkan OpenAI API Key yang sah dalam ruangan 'OpenAI Key Terminal' di atas.");
   }
 
   const systemPrompt = `You are a professional UGC (User Generated Content) Video Engineer for Sora 2 AI. 
@@ -100,7 +124,7 @@ export const generateUGCPrompt = async (idea: string, platform: 'tiktok' | 'face
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENAI_API_KEY}`
+        "Authorization": `Bearer ${currentKey}`
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
@@ -113,10 +137,15 @@ export const generateUGCPrompt = async (idea: string, platform: 'tiktok' | 'face
     });
 
     const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
+    if (data.error) {
+      if (data.error.code === 'invalid_api_key' || data.error.message.includes('Incorrect API key')) {
+        throw new Error("RALAT KUNCI API: OpenAI tidak menerima kunci ini. Sila pastikan kunci adalah penuh, aktif, dan mempunyai kredit.");
+      }
+      throw new Error(data.error.message);
+    }
     return data.choices?.[0]?.message?.content?.trim() || "";
   } catch (error: any) {
     console.error("OpenAI UGC Error:", error);
-    throw new Error(`Ralat OpenAI: ${error.message}`);
+    throw error;
   }
 };

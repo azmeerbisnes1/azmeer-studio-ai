@@ -28,6 +28,7 @@ export default function App() {
   });
 
   const [prompt, setPrompt] = useState('');
+  const [openaiManualKey, setOpenaiManualKey] = useState(() => localStorage.getItem('azmeer_manual_openai_key') || '');
   const [refiningPlatform, setRefiningPlatform] = useState<'tiktok' | 'facebook' | 'general' | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
@@ -47,6 +48,11 @@ export default function App() {
     const savedUser = sessionStorage.getItem('azmeer_session');
     if (savedUser) setUser(JSON.parse(savedUser));
   }, []);
+
+  // Update localStorage when manual key changes
+  useEffect(() => {
+    localStorage.setItem('azmeer_manual_openai_key', openaiManualKey);
+  }, [openaiManualKey]);
 
   // Sync Registry (Admin & User)
   useEffect(() => {
@@ -125,13 +131,11 @@ export default function App() {
   }, [state.history, archiveFilter, user, remoteUuids]);
 
   const updateUserQuota = async (updatedUser: User) => {
-    // 1. Save Locally for instant feedback
     const registry = JSON.parse(localStorage.getItem('azmeer_global_registry') || '[]');
     const newRegistry = registry.map((u: User) => u.id === updatedUser.id ? updatedUser : u);
     localStorage.setItem('azmeer_global_registry', JSON.stringify(newRegistry));
     setAllUsers(newRegistry);
     
-    // 2. Save to Cloud (Supabase) - We await this to ensure persistence
     if (updatedUser.password) {
       await db.saveUser(updatedUser.username, updatedUser.password, updatedUser);
     }
@@ -145,26 +149,28 @@ export default function App() {
   const handleUGCClick = async (platform: 'tiktok' | 'facebook') => {
     if (!prompt.trim()) { setState(p => ({ ...p, error: "Sila masukkan idea atau nama produk dahulu." })); return; }
     setRefiningPlatform(platform);
-    setState(p => ({ ...p, isRefining: true }));
+    setState(p => ({ ...p, isRefining: true, error: null }));
     try {
       const ugcPrompt = await generateUGCPrompt(prompt, platform);
       setPrompt(ugcPrompt);
       setDuration(15); 
       setState(p => ({ ...p, isRefining: false, success: `Prompt UGC ${platform.toUpperCase()} Berjaya Dijana!` }));
       setTimeout(() => setState(p => ({ ...p, success: null })), 3000);
-    } catch (e: any) { setState(p => ({ ...p, isRefining: false, error: e.message }));
+    } catch (e: any) { 
+      setState(p => ({ ...p, isRefining: false, error: e.message || "Gagal menjana UGC prompt." }));
     } finally { setRefiningPlatform(null); }
   };
 
   const handleRefineWithOpenAI = async () => {
     if (!prompt.trim()) return;
     setRefiningPlatform('general');
-    setState(p => ({ ...p, isRefining: true }));
+    setState(p => ({ ...p, isRefining: true, error: null }));
     try {
       const refined = await refinePromptWithOpenAI(prompt);
       setPrompt(refined);
       setState(p => ({ ...p, isRefining: false }));
-    } catch (e) { setState(p => ({ ...p, isRefining: false }));
+    } catch (e: any) { 
+      setState(p => ({ ...p, isRefining: false, error: e.message || "Gagal memurnikan prompt." }));
     } finally { setRefiningPlatform(null); }
   };
 
@@ -190,17 +196,14 @@ export default function App() {
       const result = await startVideoGen({ prompt, model: "sora-2", duration, ratio: aspectRatio, imageFile: imageFile || imageFromArchive || undefined });
       const uuid = result.uuid;
       if (uuid) {
-        // Local Save
         const myUuids = JSON.parse(localStorage.getItem(`uuids_${user.id}`) || '[]');
         myUuids.push(uuid);
         localStorage.setItem(`uuids_${user.id}`, JSON.stringify(myUuids));
-        
-        // Cloud Save - Await here so it doesn't get lost on refresh
         await db.saveUuid(user.id, uuid);
 
         optimisticUuids.current.add(uuid);
         const updatedUser = { ...user, credits: user.role === 'admin' ? user.credits : user.credits - 10, videosGenerated: user.videosGenerated + 1 };
-        await updateUserQuota(updatedUser); // Ensure quota is synced
+        await updateUserQuota(updatedUser);
         
         const optimisticItem: GeneratedVideo = { mediaType: 'video', uuid: uuid, url: '', prompt: prompt, timestamp: Date.now(), status: 1, status_percentage: result.status_percentage || 1, aspectRatio: aspectRatio, model_name: 'Sora 2', duration: duration };
         setState(p => ({ ...p, isGenerating: false, activeTab: 'ARCHIVE', history: [optimisticItem, ...p.history], success: "Penjanaan Dimulakan! Sila tunggu rendering selesai." }));
@@ -284,6 +287,25 @@ export default function App() {
             )}
 
             <div className="glass-panel p-8 sm:p-20 rounded-[3rem] sm:rounded-[4rem] border-white/10 shadow-3xl relative">
+              {/* API Key Configuration Section */}
+              <div className="mb-10 p-6 sm:p-8 bg-cyan-500/5 border border-cyan-500/20 rounded-[2.5rem] space-y-4 animate-up">
+                 <div className="flex items-center gap-3 ml-2">
+                    <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center"><svg className="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth={2}/></svg></div>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-cyan-300">OpenAI Key Terminal</h4>
+                 </div>
+                 <div className="relative">
+                    <input 
+                      type="password" 
+                      value={openaiManualKey} 
+                      onChange={(e) => setOpenaiManualKey(e.target.value)} 
+                      placeholder="sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      className="w-full bg-black/60 border border-slate-800 rounded-2xl px-6 py-4 text-xs font-mono text-cyan-400 outline-none focus:border-cyan-500 transition-all placeholder:text-slate-800"
+                    />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-700 uppercase tracking-tighter pointer-events-none">SECURE LINK</div>
+                 </div>
+                 <p className="text-[8px] text-slate-600 ml-4 italic">*Kunci ini disimpan hanya dalam pelayar anda untuk menjana prompt & UGC.</p>
+              </div>
+
               <div className="flex gap-4 sm:gap-6 mb-10 sm:mb-14">
                 <button onClick={() => setGenMode('T2V')} className={`flex-1 py-4 sm:py-6 rounded-2xl sm:rounded-3xl text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] border transition-all duration-500 ${genMode === 'T2V' ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.2)]' : 'bg-black/20 border-white/5 text-slate-600 hover:text-slate-400'}`}>Text to Video</button>
                 <button onClick={() => setGenMode('I2V')} className={`flex-1 py-4 sm:py-6 rounded-2xl sm:rounded-3xl text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] border transition-all duration-500 ${genMode === 'I2V' ? 'bg-purple-500/20 border-purple-500/50 text-purple-400 shadow-[0_0_30px_rgba(168,85,247,0.2)]' : 'bg-black/20 border-white/5 text-slate-600 hover:text-slate-400'}`}>Image to Video</button>
