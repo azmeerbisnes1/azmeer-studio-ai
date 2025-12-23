@@ -1,26 +1,30 @@
 
 /**
  * PENGESANAN API KEY OPENAI (Vercel & Vite Optimized)
+ * Menggunakan akses literal untuk memastikan Vite melakukan static replacement dengan tepat.
  */
 const getApiKey = (): string => {
+  let key = "";
   try {
-    // Akses literal untuk Vite static replacement
+    // Vite mencari string literal ini semasa build time. 
+    // Jangan gunakan optional chaining atau pembolehubah dinamik di sini.
     // @ts-ignore
-    const viteKey = import.meta.env ? import.meta.env.VITE_OPENAI_API_KEY : null;
-    if (viteKey) return viteKey;
-
-    // Fallback untuk persekitaran lain
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env && process.env.VITE_OPENAI_API_KEY) {
-      return process.env.VITE_OPENAI_API_KEY;
+    key = import.meta.env.VITE_OPENAI_API_KEY || "";
+    
+    // Fallback untuk persekitaran Node/Server-side jika diperlukan
+    if (!key && typeof process !== 'undefined' && process.env) {
+      key = process.env.VITE_OPENAI_API_KEY || "";
     }
   } catch (e) {
     console.warn("Environment access restricted.");
   }
-  return "";
+  
+  // CUCI KUNCI: Buang ruang kosong dan buang tanda petikan (" atau ') 
+  // yang sering tersilap masuk semasa copy-paste ke Vercel.
+  return key.trim().replace(/^["'](.+)["']$/, '$1');
 };
 
-const OPENAI_API_KEY = getApiKey().trim();
+const OPENAI_API_KEY = getApiKey();
 
 /**
  * Proxy Wrapper untuk mengelakkan sekatan CORS
@@ -35,7 +39,7 @@ const proxiedFetch = async (url: string, options: RequestInit) => {
  */
 export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
-    console.warn("OpenAI API Key is missing. Returning original text.");
+    console.warn("OpenAI API Key is missing or too short.");
     return text;
   }
 
@@ -61,12 +65,12 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
 
     const data = await response.json();
     if (data.error) {
-      console.error("OpenAI Error:", data.error.message);
+      console.error("OpenAI API Error Details:", data.error);
       return text;
     }
     return data.choices?.[0]?.message?.content?.trim() || text;
   } catch (error: any) {
-    console.error("OpenAI Refine Error:", error);
+    console.error("OpenAI Connection Error:", error);
     return text;
   }
 };
@@ -76,7 +80,7 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
  */
 export const generateUGCPrompt = async (idea: string, platform: 'tiktok' | 'facebook'): Promise<string> => {
   if (!OPENAI_API_KEY || OPENAI_API_KEY.length < 10) {
-    throw new Error(`PENGESAHAN GAGAL: Kunci API OpenAI tidak dikesan. Sila pastikan VITE_OPENAI_API_KEY telah ditambah di Vercel Settings dan lakukan REDEPLOY.`);
+    throw new Error(`KUNCI API TIDAK SAH: Sila pastikan VITE_OPENAI_API_KEY telah ditambah di Vercel/Hosting anda tanpa tanda petikan.`);
   }
 
   const systemPrompt = `You are a professional UGC (User Generated Content) Video Engineer for Sora 2 AI. 
