@@ -47,9 +47,11 @@ const App: React.FC = () => {
   };
 
   const saveApiKeyManually = () => {
-    localStorage.setItem('azmeer_manual_openai_key', openaiManualKey.trim());
+    const key = openaiManualKey.trim();
+    if (!key) return;
+    localStorage.setItem('azmeer_manual_openai_key', key);
     setKeySaved(true);
-    setTimeout(() => setKeySaved(false), 2000);
+    setTimeout(() => setKeySaved(false), 3000);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,14 +97,22 @@ const App: React.FC = () => {
     if (!prompt) return;
     setIsRefining(true);
     setError(null);
+    
+    // Gunakan nilai terus dari state input (supaya tak perlu simpan dulu)
     const currentKey = openaiManualKey.trim();
+    
     try {
-      const refined = currentKey.startsWith('sk-') 
-        ? await refinePromptWithOpenAI(prompt, currentKey)
-        : await refinePromptWithAI(prompt);
-      setPrompt(refined);
+      // Jika key ada (panjang sk-proj- biasanya > 40), gunakan OpenAI
+      if (currentKey.length > 20) {
+        const refined = await refinePromptWithOpenAI(prompt, currentKey);
+        setPrompt(refined);
+      } else {
+        // Fallback ke Gemini jika OpenAI key tak diisi
+        const refined = await refinePromptWithAI(prompt);
+        setPrompt(refined);
+      }
     } catch (err: any) {
-      setError(err instanceof Error ? err.message : "Refinement node error.");
+      setError(err.message || "Gagal memproses idea.");
     } finally {
       setIsRefining(false);
     }
@@ -112,7 +122,14 @@ const App: React.FC = () => {
     if (!prompt) return;
     setIsGeneratingUGC(true);
     setError(null);
+    
     const currentKey = openaiManualKey.trim();
+    if (currentKey.length < 20) {
+      setError("Sila isi OpenAI API Key dahulu untuk fungsi UGC.");
+      setIsGeneratingUGC(false);
+      return;
+    }
+
     try {
       const refined = await generateUGCPrompt({
         text: prompt,
@@ -122,7 +139,7 @@ const App: React.FC = () => {
       });
       setPrompt(refined);
     } catch (err: any) {
-      setError(err instanceof Error ? err.message : "UGC Script failure.");
+      setError(err.message || "Gagal menjana skrip UGC.");
     } finally {
       setIsGeneratingUGC(false);
     }
@@ -148,6 +165,7 @@ const App: React.FC = () => {
     <div className="min-h-screen text-white selection:bg-cyan-500/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-8">
         
+        {/* HEADER */}
         <header className="flex flex-col sm:flex-row justify-between items-center gap-6 mb-8 sm:mb-16 animate-up">
           <div className="flex items-center gap-4 sm:gap-5">
             <div className="cyber-logo-wrapper w-10 h-10 sm:w-14 sm:h-14">
@@ -200,63 +218,62 @@ const App: React.FC = () => {
 
             <div className="space-y-6 sm:space-y-8 animate-up">
               
-              <div className="bg-black/40 backdrop-blur-xl border border-white/5 rounded-2xl sm:rounded-3xl p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 transition-all hover:border-cyan-500/20">
+              {/* API Terminal */}
+              <div className="bg-black/40 backdrop-blur-xl border border-white/5 rounded-2xl sm:rounded-3xl p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 transition-all hover:border-cyan-500/20 group">
                 <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 sm:border-r border-white/5 w-full sm:w-auto">
                   <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
-                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-400">OpenAI (4o-mini)</span>
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-400">OpenAI Terminal</span>
                 </div>
                 <input 
                   type="password" 
                   value={openaiManualKey} 
                   onChange={(e) => setOpenaiManualKey(e.target.value)} 
-                  placeholder="Masukkan sk-proj-..."
+                  placeholder="Isi sk-proj-... di sini"
                   className="w-full sm:flex-grow bg-transparent border-none outline-none text-[10px] sm:text-xs font-mono text-cyan-400 placeholder:text-slate-800"
                 />
-                {openaiManualKey.length > 5 && (
-                  <button 
-                    onClick={saveApiKeyManually}
-                    className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${keySaved ? 'bg-green-600 text-white' : 'bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600 hover:text-white'}`}
-                  >
-                    {keySaved ? 'Saved!' : 'Save Key'}
-                  </button>
-                )}
+                <button 
+                  onClick={saveApiKeyManually}
+                  className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 transform ${keySaved ? 'bg-green-600 text-white scale-105 shadow-lg shadow-green-900/20' : 'bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600 hover:text-white active:scale-95'}`}
+                >
+                  {keySaved ? 'DISIMPAN ✓' : 'SIMPAN KUNCI'}
+                </button>
               </div>
 
+              {/* Main Prompt Suite */}
               <div className="glass-panel p-6 sm:p-12 rounded-3xl sm:rounded-[3.5rem] border border-white/5 relative overflow-hidden">
                 <div className="flex flex-col gap-6 sm:gap-8">
                   <div className="flex-grow">
                     <textarea 
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
-                      placeholder={selectedImage ? "Describe the UGC motion for this product..." : "Masukkkan idea produk/kandungan untuk dijana prompt UGC..."}
+                      placeholder={selectedImage ? "Describe the motion for this product..." : "Tulis idea video anda di sini..."}
                       className="w-full bg-transparent border-none outline-none text-lg sm:text-3xl font-medium min-h-[120px] sm:min-h-[160px] placeholder:text-slate-800 transition-all focus:placeholder:text-slate-700 resize-none"
                     />
                   </div>
                   
                   {imagePreview && (
                     <div className="relative w-full sm:w-48 aspect-video sm:aspect-square bg-black/40 rounded-xl sm:rounded-2xl overflow-hidden border border-white/10 group">
-                      <img src={imagePreview} className="w-full h-full object-cover" alt="i2v source" />
+                      <img src={imagePreview} className="w-full h-full object-cover" alt="source" />
                       <button 
                         onClick={removeImage}
                         className="absolute top-2 right-2 p-1.5 sm:p-2 bg-black/60 rounded-full hover:bg-red-600 transition-colors"
                       >
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 18L18 6M6 6l12 12" strokeWidth={3} /></svg>
                       </button>
-                      <div className="absolute inset-x-0 bottom-0 bg-cyan-600/80 py-1 text-center text-[7px] font-black uppercase tracking-tighter">UGC i2v Mode</div>
                     </div>
                   )}
                 </div>
 
                 <div className="mt-8 flex flex-col sm:flex-row gap-4 items-center bg-white/5 p-4 rounded-2xl border border-white/5">
                    <div className="flex items-center gap-3 w-full sm:w-auto">
-                     <span className="text-[8px] font-black uppercase tracking-widest text-slate-500">Gender:</span>
+                     <span className="text-[8px] font-black uppercase tracking-widest text-slate-500">Karakter:</span>
                      <select 
                         value={ugcGender} 
                         onChange={(e) => setUgcGender(e.target.value as any)}
-                        className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[9px] font-bold text-cyan-400 outline-none"
+                        className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[9px] font-bold text-cyan-400 outline-none hover:border-cyan-500/40"
                      >
-                       <option value="female">Malay Woman (Hijab)</option>
-                       <option value="male">Malay Man (Polite)</option>
+                       <option value="female">Woman (Hijab)</option>
+                       <option value="male">Man (Polite)</option>
                      </select>
                    </div>
                    <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -264,10 +281,10 @@ const App: React.FC = () => {
                      <select 
                         value={ugcPlatform} 
                         onChange={(e) => setUgcPlatform(e.target.value as any)}
-                        className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[9px] font-bold text-purple-400 outline-none"
+                        className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[9px] font-bold text-purple-400 outline-none hover:border-purple-500/40"
                      >
-                       <option value="tiktok">TikTok (Yellow Bag)</option>
-                       <option value="facebook">Facebook (Learn More)</option>
+                       <option value="tiktok">TikTok Style</option>
+                       <option value="facebook">FB/IG Style</option>
                      </select>
                    </div>
                    <div className="flex-grow"></div>
@@ -277,7 +294,7 @@ const App: React.FC = () => {
                       className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-purple-900/40 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {isGeneratingUGC ? <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M13 10V3L4 14h7v7l9-11h-7z" strokeWidth={2}/></svg>}
-                      <span>Gen UGC Script (15s)</span>
+                      <span>Gen UGC Prompt</span>
                     </button>
                 </div>
 
@@ -298,7 +315,7 @@ const App: React.FC = () => {
                       className="flex-grow sm:flex-none bg-white/5 hover:bg-white/10 px-6 sm:px-10 rounded-xl sm:rounded-2xl text-[9px] font-black uppercase tracking-widest border border-white/10 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
                     >
                       {isRefining && <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>}
-                      <span>Simple Refine</span>
+                      <span>Guna AI (Prompt)</span>
                     </button>
                   </div>
 
@@ -307,12 +324,13 @@ const App: React.FC = () => {
                     disabled={isGenerating || !prompt}
                     className="h-14 sm:h-16 flex-grow relative overflow-hidden bg-cyan-600 hover:bg-cyan-500 px-8 sm:px-12 rounded-xl sm:rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50 shadow-2xl shadow-cyan-900/40 active:scale-95"
                   >
-                    <span>{isGenerating ? 'Rendering...' : 'Generate Sora 2 Video'}</span>
+                    <span>{isGenerating ? 'Rendering...' : 'Jana Video Sora 2'}</span>
                   </button>
                 </div>
               </div>
             </div>
 
+            {/* RESULTS GRID */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10 animate-up" style={{ animationDelay: '0.3s' }}>
               {filteredHistory.length > 0 ? (
                 filteredHistory.map(item => {
@@ -323,7 +341,7 @@ const App: React.FC = () => {
                 })
               ) : (
                 <div className="col-span-full py-16 sm:py-32 text-center border-2 border-dashed border-white/5 rounded-3xl sm:rounded-[3rem]">
-                   <p className="text-[9px] sm:text-[10px] font-black text-slate-700 uppercase tracking-[0.5em]">Sector Empty: No Assets Found</p>
+                   <p className="text-[9px] sm:text-[10px] font-black text-slate-700 uppercase tracking-[0.5em]">Tiada rekod</p>
                 </div>
               )}
             </div>
@@ -332,12 +350,12 @@ const App: React.FC = () => {
       </div>
 
       {error && (
-        <div className="fixed bottom-6 sm:bottom-10 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 bg-red-600/90 backdrop-blur-3xl px-6 sm:px-10 py-4 sm:py-5 rounded-xl sm:rounded-2xl text-[9px] font-black uppercase tracking-widest border border-red-500/50 shadow-2xl z-50 flex items-center justify-between sm:justify-center gap-6 animate-up">
+        <div className="fixed bottom-6 sm:bottom-10 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 bg-red-600/90 backdrop-blur-3xl px-6 sm:px-10 py-4 sm:py-5 rounded-xl sm:rounded-2xl text-[9px] font-black uppercase tracking-widest border border-red-500/50 shadow-2xl z-50 flex items-center justify-between sm:justify-center gap-6 animate-up max-w-[90vw]">
           <div className="flex items-center gap-3">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth={2.5}/></svg>
-            <span>{error}</span>
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth={2.5}/></svg>
+            <span className="truncate">{error}</span>
           </div>
-          <button onClick={() => setError(null)} className="text-white/50 hover:text-white">✕</button>
+          <button onClick={() => setError(null)} className="text-white/50 hover:text-white transition-colors">✕</button>
         </div>
       )}
     </div>

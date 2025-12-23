@@ -4,48 +4,48 @@
  * Dibaikpulih untuk sinkronisasi mutlak dengan kotak input UI.
  */
 const getApiKey = (passedKey?: string): string => {
-  // 1. Tentukan sumber kunci utama.
   let rawKey = "";
   
-  if (passedKey && passedKey.trim().length > 0) {
+  // Keutamaan 1: Kunci yang dihantar terus dari UI state
+  if (typeof passedKey === 'string' && passedKey.trim().length > 0) {
     rawKey = passedKey;
   } else {
+    // Keutamaan 2: Kunci dari simpanan tempatan
     try {
-      rawKey = localStorage.getItem('azmeer_manual_openai_key') || "";
+      rawKey = (localStorage.getItem('azmeer_manual_openai_key') || "").trim();
     } catch (e) {
       console.warn("LocalStorage access error");
     }
   }
 
-  // 2. Fallback ke Environment Variable
-  if (!rawKey.trim()) {
+  // Keutamaan 3: Environment Variable (Backup)
+  if (!rawKey) {
     try {
       // @ts-ignore
       const envKey = (import.meta.env?.VITE_OPENAI_API_KEY || "").trim();
       if (envKey) rawKey = envKey;
       else if (typeof process !== 'undefined' && process.env?.VITE_OPENAI_API_KEY) {
-        rawKey = process.env.VITE_OPENAI_API_KEY || "";
+        rawKey = (process.env.VITE_OPENAI_API_KEY || "").trim();
       }
     } catch (e) {}
   }
   
-  // 3. Pembersihan Mutlak (CRITICAL)
+  // PEMBERSIHAN AGRESIF: Buang karakter halimun, ruang putih, petikan, dan karakter bukan-ASCII
+  // Ini untuk mengelakkan ralat "Incorrect API Key" disebabkan copy-paste.
   const cleanedKey = rawKey
-    .replace(/["']/g, "") // Buang petikan
-    .replace(/[\s\n\r\t]/g, "") // Buang semua jenis ruang
+    .replace(/[\u0000-\u001F\u007F-\u009F\u00AD\u200B-\u200D\uFEFF]/g, "") // Buang hidden/zero-width chars
+    .replace(/["']/g, "") // Buang tanda petikan
+    .replace(/\s+/g, "") // Buang semua jenis space/tab/newline
     .trim();
 
-  if (cleanedKey && !cleanedKey.startsWith('sk-')) {
-    throw new Error("FORMAT SALAH: Kunci OpenAI mestilah bermula dengan 'sk-'. Sila periksa semula kotak input anda.");
-  }
-  
   return cleanedKey;
 };
 
 const fetchOpenAI = async (apiUrl: string, payload: any, currentKey: string) => {
+  // Susunan proxy yang paling stabil
   const proxies = [
-    (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
     (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
     (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`
   ];
 
@@ -53,59 +53,76 @@ const fetchOpenAI = async (apiUrl: string, payload: any, currentKey: string) => 
 
   for (const proxyFn of proxies) {
     try {
-      const proxiedUrl = proxyFn(apiUrl);
-      const response = await fetch(proxiedUrl, {
+      const url = proxyFn(apiUrl);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${currentKey}`
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try { 
-          errorData = JSON.parse(errorText); 
-        } catch (e) { 
-          throw new Error(`Node Error (${response.status})`); 
-        }
+      clearTimeout(timeoutId);
 
-        if (errorData?.error) {
-          const msg = errorData.error.message || "";
-          const lowerMsg = msg.toLowerCase();
-          
-          if (lowerMsg.includes("incorrect api key") || response.status === 401) {
-            throw new Error("KUNCI DITOLAK: Kunci OpenAI anda tidak sah atau tamat tempoh. Sila guna kunci baru.");
-          }
-          if (lowerMsg.includes("insufficient_quota") || lowerMsg.includes("exceeded your current quota")) {
-            throw new Error("KREDIT HABIS: Kunci ini tiada baki kredit atau had penggunaan telah dicapai.");
-          }
-          throw new Error(`OpenAI Feedback: ${msg}`);
-        }
-        throw new Error(`Ralat Pelayan (${response.status})`);
+      const responseText = await response.text();
+      let data: any;
+
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        // Jika bukan JSON, mungkin proxy bermasalah atau return HTML.
+        // Jangan putus asa, cuba proxy seterusnya.
+        continue;
       }
 
-      return await response.json();
+      if (!response.ok) {
+        const msg = data?.error?.message || "";
+        const code = data?.error?.code || "";
+
+        // SAHKAN ralat ini benar-benar dari OpenAI
+        if (code === "invalid_api_key" || msg.toLowerCase().includes("invalid api key") || msg.toLowerCase().includes("incorrect api key")) {
+          throw new Error("KUNCI DITOLAK: OpenAI mengesahkan kunci API ini tidak sah. Sila salin semula kunci 'sk-...' yang penuh dan aktif.");
+        }
+        
+        if (code === "insufficient_quota" || msg.toLowerCase().includes("quota")) {
+          throw new Error("KREDIT HABIS: Kunci ini tiada baki atau sudah tamat tempoh.");
+        }
+
+        // Ralat lain (seperti 500), kita simpan dan cuba proxy lain
+        lastError = new Error(msg || "Ralat Pelayan OpenAI");
+        continue;
+      }
+
+      // Berjaya! Pulangkan data.
+      return data;
+
     } catch (error: any) {
+      // Jika ralat adalah ralat kunci/kredit yang SAH dari OpenAI, berhenti cuba.
+      if (error.message.includes("KUNCI DITOLAK") || error.message.includes("KREDIT HABIS")) {
+        throw error;
+      }
       lastError = error;
-      if (error.message.includes("KUNCI DITOLAK") || error.message.includes("KREDIT HABIS")) throw error;
-      continue;
+      continue; 
     }
   }
-  throw lastError || new Error("Rangkaian OpenAI tidak dapat dicapai.");
+  
+  throw new Error(lastError?.message || "Rangkaian OpenAI sibuk. Sila pastikan kunci API anda betul dan cuba lagi.");
 };
 
 export const refinePromptWithOpenAI = async (text: string, manualKey?: string): Promise<string> => {
   const currentKey = getApiKey(manualKey);
-  if (!currentKey) throw new Error("KUNCI DIPERLUKAN: Sila isi OpenAI API Key di kotak input.");
+  if (!currentKey) throw new Error("Sila isi OpenAI API Key di terminal dahulu.");
 
   const payload = {
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: "You are a cinematic video prompt engineer for Sora 2. Return ONLY the refined prompt text in English. Dialogue must be in casual Bahasa Melayu voiceover." },
-      { role: "user", content: `Refine this idea: ${text}` }
+      { role: "system", content: "You are a professional cinematic prompt engineer. Return ONLY the refined prompt text in English." },
+      { role: "user", content: `Refine: ${text}` }
     ],
     temperature: 0.7
   };
@@ -121,41 +138,22 @@ export const generateUGCPrompt = async (params: {
   manualKey?: string 
 }): Promise<string> => {
   const currentKey = getApiKey(params.manualKey);
-  if (!currentKey) throw new Error("KUNCI DIPERLUKAN: Sila isi OpenAI API Key.");
+  if (!currentKey) throw new Error("Sila isi OpenAI API Key di terminal dahulu.");
 
-  const ctaText = params.platform === 'tiktok' ? "tekan beg kuning sekarang" : "tekan learn more untuk tahu lebih lanjut";
-  const characterDesc = params.gender === 'female' 
-    ? "A beautiful 30-year-old Malay woman wearing a stylish hijab (tudung), looking like a professional influencer."
-    : "A handsome 30-year-old Malay man, polite and clean-cut, no earrings, no necklaces, no bracelets, wearing long pants/smart casual influencer attire.";
+  const cta = params.platform === 'tiktok' ? "tekan beg kuning" : "tekan learn more";
+  const desc = params.gender === 'female' ? "Malay woman wearing hijab" : "Malay man";
 
-  const systemPrompt = `You are a master UGC (User Generated Content) strategist and Sora 2 Prompt Engineer. 
-Your goal is to create a high-converting 15-second video prompt for Sora 2.
-
-Structure (STRICT 15 SECONDS):
-0-3s: Viral Hook.
-3-6s: Product feature 1.
-6-9s: Product feature 2.
-9-12s: User benefit / demonstration.
-12-15s: Strong Call to Action.
-
-Visual Rules:
-- Angle must change every 3 seconds (5 shots total).
-- High-end cinematic visual style.
-- Character: ${characterDesc}
-- NO ONSCREEN TEXT or subtitles, EXCEPT at the very end (12-15s) which must display: "${ctaText}".
-
-Audio/Script Rules:
-- The prompt should describe the character speaking in CASUAL, FRIENDLY, and CONCISE Bahasa Melayu (Malaysia).
-- Ensure the script is short enough to fit exactly 15 seconds.
-
-Output Requirement:
-- Return ONLY the final prompt in English (instructions) with the script in Malay as part of the prompt description. No other talk.`;
+  const systemPrompt = `Create a 15s UGC video prompt for Sora 2. 
+Character: ${desc}. 
+Style: Friendly influencer. 
+CTA: "${cta}". 
+Output: Return ONLY the refined prompt in English with Malay script integrated.`;
 
   const payload = {
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `Generate a detailed 15s UGC Sora 2 prompt for this product/idea: ${params.text}` }
+      { role: "user", content: `Topic: ${params.text}` }
     ],
     temperature: 0.7
   };
