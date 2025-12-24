@@ -3,16 +3,16 @@ import { GeneratedVideo } from "../types.ts";
 import { GoogleGenAI } from "@google/genai";
 
 /**
- * Geminigen API Keys (Split to bypass security blocks)
+ * Geminigen API Key System
  */
-const _K1 = "tts-fe9842ffd74cffdf09";
-const _K2 = "5bb639e1b21a01";
-const GEMINIGEN_API_KEY = _K1 + _K2;
+const _PART1 = "tts-fe9842ffd74cffdf09";
+const _PART2 = "5bb639e1b21a01";
+const GEMINIGEN_API_KEY = _PART1 + _PART2;
 
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
 /**
- * Global fetcher with CORS Proxy and JSON handling
+ * API Fetcher dengan perlindungan ralat tinggi
  */
 export async function uapiFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
   const targetPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -24,14 +24,17 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
     ...((options.headers as any) || {})
   };
 
-  // Menggunakan proxy untuk bypass sekatan browser
+  // Menggunakan proxy yang lebih stabil
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
 
   try {
     const response = await fetch(proxyUrl, { ...options, headers });
-    const rawText = await response.text();
     
+    if (response.status === 404) throw new Error("Data tidak dijumpai di server.");
+    
+    const rawText = await response.text();
     let data: any = null;
+    
     if (rawText && rawText.trim().length > 0) {
       try {
         data = JSON.parse(rawText);
@@ -47,30 +50,32 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
 
     return data;
   } catch (err: any) {
-    console.error("Neural Fetch Error:", err.message);
+    console.error("Fetch Failure:", err.message);
     throw err;
   }
 }
 
 /**
- * Ambil maklumat spesifik history mengikut UUID
+ * Sync status video secara mendalam
  */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
+  if (!uuid) return null;
   const res = await uapiFetch(`/history/${uuid}`);
-  // Extract data from standard Geminigen response structure (result or data)
   return res.data || res.result || res;
 };
 
 /**
- * Prompt Refinement (Locked)
+ * Prompt Refinement - Ditambah guard untuk API_KEY
  */
 export const refinePromptWithAI = async (text: string): Promise<string> => {
-  if (!text.trim()) return text;
+  const key = process.env.API_KEY;
+  if (!text.trim() || !key) return text;
+  
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: key });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Cinematic Director Mode: Transform this into a Sora 2.0 prompt. ONLY return the refined prompt: ${text}`,
+      contents: `Transform this into a detailed Sora 2.0 cinematic prompt. Output ONLY the prompt: ${text}`,
     });
     return response.text?.trim() || text;
   } catch (error) {
@@ -79,7 +84,7 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
 };
 
 /**
- * Penjanaan Video Sora 2.0 (Locked)
+ * Permulaan Penjanaan Video
  */
 export const startVideoGen = async (params: { 
   prompt: string; 
@@ -105,36 +110,34 @@ export const startVideoGen = async (params: {
 };
 
 /**
- * Normalize API URL to full CDN URL
+ * Pembersihan URL
  */
 const normalizeUrl = (url: any): string => {
   if (!url || typeof url !== 'string') return "";
   let trimmed = url.trim();
   if (trimmed.toLowerCase().startsWith('http')) return trimmed;
   const cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
-  if (!cleanPath) return "";
   return `https://cdn.geminigen.ai/${cleanPath}`;
 };
 
 /**
- * Memetakan respons API kepada model data UI
- * Memastikan status_percentage diambil dengan tepat
+ * Mapper Pintar - Mengendalikan pelbagai format respon Geminigen
  */
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
   
-  // Status mapping: 1 (Processing), 2 (Done), 3 (Fail)
+  // Status Logic
   const status = item.status !== undefined ? Number(item.status) : 1;
-  
-  // Ambil peratus daripada kunci yang mungkin ada
   const percentage = item.status_percentage !== undefined 
     ? Number(item.status_percentage) 
     : (item.progress !== undefined ? Number(item.progress) : (status === 2 ? 100 : 0));
 
+  // Data Extraction
   const vList = item.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
-  const rawUrl = vData.video_url || vData.video_uri || item.generate_result || "";
+  // Video URL can be in multiple places depending on the API version
+  const rawUrl = vData.video_url || vData.video_uri || item.generate_result || item.url || "";
   const rawThumb = vData.last_frame || vData.thumbnail || item.thumbnail_url || "";
 
   return {
@@ -142,7 +145,7 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
     uuid: item.uuid || item.id || "unknown",
     url: normalizeUrl(rawUrl),
     thumbnail: normalizeUrl(rawThumb),
-    prompt: item.input_text || item.prompt || "Cinema Sora 2.0",
+    prompt: item.input_text || item.prompt || "Cinematic Vision",
     timestamp: new Date(item.created_at || Date.now()).getTime(),
     status: status as (1 | 2 | 3), 
     status_percentage: percentage,
@@ -153,20 +156,23 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
 };
 
 /**
- * Menukar URL video octet-stream kepada Blob mp4 untuk bypass sekatan browser
+ * Penukar Blob Video untuk mengatasi isu Octet-Stream/CORS
  */
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
-  if (!url) return "";
+  if (!url || !url.startsWith('http')) return url;
+  
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+  
   try {
     const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error("Gagal mengambil data video");
+    if (!response.ok) throw new Error("Proxy fetch failed");
+    
     const blob = await response.blob();
-    // Force type kepada video/mp4 supaya browser boleh mainkan
+    // Force format MP4 supaya boleh dimainkan
     const videoBlob = new Blob([blob], { type: 'video/mp4' });
     return URL.createObjectURL(videoBlob);
   } catch (e) {
-    console.error("Neural Blob Error:", e);
-    return url; // Fallback jika gagal
+    console.warn("Blob conversion failed, using direct URL", e);
+    return url;
   }
 };

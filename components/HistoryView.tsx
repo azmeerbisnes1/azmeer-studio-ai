@@ -22,10 +22,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
     }
 
     if (showLoading) setLoading(true);
-    setError(null);
     
     try {
-      // 1. Ambil UUID yang disimpan dalam Supabase anda
+      // 1. Ambil UUID yang disimpan dalam Supabase
       const userUuids = await db.getUuids(user.username);
       
       if (!userUuids || userUuids.length === 0) {
@@ -34,11 +33,10 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
         return;
       }
 
-      // 2. Deep Sync: Dapatkan status LIVE dari server Geminigen untuk setiap UUID
-      // Ini menyelesaikan isu desync antara Supabase dan API asal
+      // 2. Deep Sync dengan server Geminigen
       const videoDataPromises = userUuids.map(uuid => 
         getSpecificHistory(uuid).catch(err => {
-          console.warn(`Sync failed for UUID: ${uuid}`, err);
+          console.error(`Sync failure for ${uuid}:`, err);
           return null;
         })
       );
@@ -52,7 +50,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
           
       setHistory(videoItems);
 
-      // 3. Polling Logic: Jika ada video status 1 (Processing), poll setiap 4 saat
+      // 3. Polling Logic
       const hasActiveTasks = videoItems.some(v => Number(v.status) === 1);
       
       if (pollingTimerRef.current) {
@@ -61,11 +59,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       }
 
       if (hasActiveTasks) {
-        pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 4000);
+        pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 5000);
       }
+      
+      setError(null);
     } catch (err: any) {
-      console.error("Vault Sync Error:", err);
-      setError("Gagal menyambung ke Arkib Pusat. Sila refresh semula.");
+      console.error("Vault Logic Error:", err);
+      setError("Gagal menyambung ke Arkib Pusat. Sila cuba lagi sebentar.");
     } finally {
       if (showLoading) setLoading(false);
     }
