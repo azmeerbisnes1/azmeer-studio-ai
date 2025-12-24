@@ -2,12 +2,12 @@
 import { GeneratedVideo } from "../types.ts";
 import { GoogleGenAI } from "@google/genai";
 
-// Use the specific Geminigen key provided by the user
+// Geminigen API Configuration
 const GEMINIGEN_API_KEY = "tts-fe9842ffd74cffdf095bb639e1b21a01";
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
 /**
- * Core fetcher for Geminigen.ai API with CORS handling.
+ * Core fetcher for Geminigen.ai API with CORS proxy support.
  */
 export async function uapiFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
   const targetPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -19,7 +19,6 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
     ...((options.headers as any) || {})
   };
 
-  // Using a robust proxy to bypass CORS issues for API calls
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
 
   try {
@@ -49,7 +48,6 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
 
 /**
  * Get all generation history.
- * Documentation: GET https://api.geminigen.ai/uapi/v1/histories
  */
 export const getAllHistory = async (page = 1, itemsPerPage = 50): Promise<any> => {
   return await uapiFetch(`/histories?filter_by=all&items_per_page=${itemsPerPage}&page=${page}`);
@@ -57,16 +55,15 @@ export const getAllHistory = async (page = 1, itemsPerPage = 50): Promise<any> =
 
 /**
  * Get specific history detail by UUID.
- * Documentation: GET https://api.geminigen.ai/uapi/v1/history/{conversion_uuid}
+ * Doc: GET /uapi/v1/history/{conversion_uuid}
  */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   const res = await uapiFetch(`/history/${uuid}`);
-  // Documentation shows data can be nested or at root depending on the endpoint wrapper
   return res.data || res.result || res;
 };
 
 /**
- * Restores and protects prompt refining logic as requested (Locked).
+ * Prompt Refinement (Locked logic - do not modify)
  */
 export const refinePromptWithAI = async (text: string): Promise<string> => {
   if (!text.trim()) return text;
@@ -86,7 +83,7 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
 };
 
 /**
- * Sora 2.0 Video Generation Trigger (Locked).
+ * Sora 2.0 Video Generation (Locked logic - do not modify)
  */
 export const startVideoGen = async (params: { 
   prompt: string; 
@@ -112,12 +109,13 @@ export const startVideoGen = async (params: {
 };
 
 /**
- * Sanitizes and normalizes CDN URLs.
+ * Normalizes URLs from API to absolute CDN URLs
  */
 const normalizeUrl = (url: any): string => {
   if (!url || typeof url !== 'string') return "";
   let trimmed = url.trim();
   
+  // Jika URL sudah lengkap (e.g. Cloudflare R2 presigned), biarkan ia seadanya
   if (trimmed.toLowerCase().startsWith('http')) return trimmed;
   
   const cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
@@ -126,16 +124,15 @@ const normalizeUrl = (url: any): string => {
 };
 
 /**
- * Maps raw API response to the App's Typed GeneratedVideo model.
+ * Maps API response to internal GeneratedVideo type.
+ * Ensures status_percentage is correctly captured.
  */
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
   
-  // Status: 1 (Processing), 2 (Completed), 3 (Failed)
   const status = item.status !== undefined ? Number(item.status) : 1;
   const percentage = item.status_percentage !== undefined ? Number(item.status_percentage) : (status === 2 ? 100 : 0);
 
-  // Extract media from documented nested arrays
   const vList = item.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
@@ -158,30 +155,25 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
 };
 
 /**
- * Advanced Blob Syncing to bypass CORS and ensure direct preview/download.
+ * Advanced video proxy for stable preview and download.
+ * Memaksa fail ditukar kepada video/mp4 Blob untuk bypass octet-stream issue.
  */
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
   if (!url) return "";
   
-  const proxies = [
-    (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-    (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`
-  ];
+  // Gunakan corsproxy.io untuk bypass sekatan CORS pada cloudflare storage
+  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
 
-  for (const proxyFn of proxies) {
-    try {
-      const response = await fetch(proxyFn(url));
-      if (!response.ok) continue;
-      
-      const blob = await response.blob();
-      // Specifically mark as video/mp4 to ensure browser handles it as playable media
-      const videoBlob = new Blob([blob], { type: 'video/mp4' });
-      return URL.createObjectURL(videoBlob);
-    } catch (e) {
-      console.warn(`Neural Sync Attempt failed for ${url}:`, e);
-      continue;
-    }
+  try {
+    const response = await fetch(proxyUrl);
+    if (!response.ok) throw new Error("Fetch failed");
+    
+    const blob = await response.blob();
+    // PENTING: Paksa mime-type kepada video/mp4 supaya browser boleh mainkan fail octet-stream
+    const videoBlob = new Blob([blob], { type: 'video/mp4' });
+    return URL.createObjectURL(videoBlob);
+  } catch (e) {
+    console.warn(`Neural link sync failed for ${url}, falling back to direct access.`);
+    return url;
   }
-  
-  return url; // Fallback to raw URL
 };
