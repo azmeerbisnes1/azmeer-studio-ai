@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getSpecificHistory, getAllHistory, mapToGeneratedVideo } from '../services/geminigenService.ts';
+import { getAllHistory, getSpecificHistory, mapToGeneratedVideo } from '../services/geminigenService.ts';
 import { db } from '../services/supabaseService.ts';
 import { GeneratedVideo, User } from '../types.ts';
 import { VideoCard } from './VideoCard.tsx';
@@ -16,8 +16,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
   const pollingTimerRef = useRef<number | null>(null);
 
   /**
-   * Syncs the user's specific history by fetching their UUIDs from Supabase
-   * and updating the current state from Geminigen.ai live data.
+   * Primary sync function to match Geminigen.ai History.
    */
   const fetchHistory = useCallback(async (showLoading = true) => {
     if (!user || !user.username) {
@@ -29,41 +28,24 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
     setError(null);
     
     try {
-      // 1. Get all UUIDs stored for this user in Supabase
+      // 1. Get user specific UUIDs from Supabase
       const userUuids = await db.getUuids(user.username);
       
-      if (!userUuids || userUuids.length === 0) {
-        // Fallback: Check if there's any history in Geminigen that matches our key
-        // to see if we missed anything (optional safeguard)
-        const allRes = await getAllHistory(1, 20);
-        const allItems = allRes.result || [];
-        // Since we don't have a reliable user-filter on the API, we rely on Supabase
-        // but if items are missing in Supabase, they won't show here.
-        setHistory([]);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Fetch live details for each UUID from Geminigen to get per-second updates
-      const videoDataPromises = userUuids.map(uuid => 
-        getSpecificHistory(uuid).catch(err => {
-          console.error(`Failed to fetch UUID ${uuid}:`, err);
-          return null;
-        })
-      );
+      // 2. Fetch all history from Geminigen to sync metadata
+      const allHistoryResponse = await getAllHistory(1, 50);
+      const geminigenItems = allHistoryResponse?.result || allHistoryResponse?.data || [];
       
-      const rawResults = await Promise.all(videoDataPromises);
-      
-      // 3. Map to UI format and sort by newest first
-      const videoItems = rawResults
-        .filter(item => item !== null && (item.uuid || item.id))
-        .map(item => mapToGeneratedVideo(item))
-        .sort((a, b) => b.timestamp - a.timestamp);
-          
-      setHistory(videoItems);
+      // 3. Filter to only show videos that belong to this user (via Supabase UUID list)
+      // and map them correctly to the UI model.
+      const matchedItems = geminigenItems
+        .filter((item: any) => userUuids.includes(item.uuid))
+        .map((item: any) => mapToGeneratedVideo(item));
 
-      // 4. Automatic Polling: If any video is still processing (Status 1)
-      const hasActiveTasks = videoItems.some(v => Number(v.status) === 1);
+      // 4. Update local state
+      setHistory(matchedItems.sort((a, b) => b.timestamp - a.timestamp));
+
+      // 5. Check if we need to poll for updates (if any video is processing [status 1])
+      const hasActiveTasks = matchedItems.some(v => v.status === 1);
       
       if (pollingTimerRef.current) {
         window.clearTimeout(pollingTimerRef.current);
@@ -71,12 +53,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       }
 
       if (hasActiveTasks) {
-        // Poll every 5 seconds for status/percentage changes
+        // Poll every 5 seconds for real-time percentage updates
         pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 5000);
       }
     } catch (err: any) {
       console.error("Sync Error:", err);
-      setError("Gagal menyelaraskan Arkib Video. Sila cuba lagi.");
+      setError("Gagal menyelaraskan Arkib Video dengan Geminigen.ai.");
     } finally {
       if (showLoading) setLoading(false);
     }

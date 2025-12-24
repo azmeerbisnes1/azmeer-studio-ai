@@ -27,6 +27,9 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
     };
   }, [internalSrc]);
 
+  /**
+   * Syncs the media to a local Blob for stable preview and download.
+   */
   const establishNeuralLink = async () => {
     if (!isCompleted || !video.url || isLoadingNeural || internalSrc) return null;
     
@@ -109,7 +112,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       }
     } catch (err) {
       console.error("Download failed:", err);
-      // Fallback to opening direct link if proxy fails
       window.open(video.url, '_blank');
     } finally {
       setIsDownloading(false);
@@ -135,6 +137,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
         'border-white/5 bg-slate-900/40 hover:border-cyan-500/20 shadow-2xl hover:scale-[1.01]'
       }`}
     >
+      {/* Media Viewport */}
       <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
         {isCompleted && !videoError ? (
           <>
@@ -188,11 +191,12 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
              </button>
           </div>
         ) : (
+          /* Processing Viewport */
           <div className="text-center space-y-8 w-full px-12 py-20 bg-slate-950/40">
-             <div className="relative w-20 h-20 mx-auto">
+             <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
                 <div className="absolute inset-0 border-4 border-slate-900 rounded-full"></div>
                 <div className="absolute inset-0 border-4 border-t-cyan-500 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
-                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-cyan-400 font-orbitron">
+                <div className="text-xl font-black text-cyan-400 font-orbitron">
                   {progress}%
                 </div>
              </div>

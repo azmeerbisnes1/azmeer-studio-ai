@@ -47,6 +47,7 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
 
 /**
  * Get all generation history from Geminigen.ai
+ * Documentation: GET /uapi/v1/histories
  */
 export const getAllHistory = async (page = 1, itemsPerPage = 50): Promise<any> => {
   return await uapiFetch(`/histories?filter_by=all&items_per_page=${itemsPerPage}&page=${page}`);
@@ -54,6 +55,7 @@ export const getAllHistory = async (page = 1, itemsPerPage = 50): Promise<any> =
 
 /**
  * Get specific generation history by UUID
+ * Documentation: GET /uapi/v1/history/{conversion_uuid}
  */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   const res = await uapiFetch(`/history/${uuid}`);
@@ -68,49 +70,47 @@ const normalizeUrl = (url: any): string => {
     return trimmed;
   }
   
-  // Handle paths that might need the CDN prefix
   const cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
   if (!cleanPath) return "";
   return `https://cdn.geminigen.ai/${cleanPath}`;
 };
 
 /**
- * Map API item to app's GeneratedVideo interface
+ * Map API item to app's GeneratedVideo interface following the provided documentation.
  */
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
   
-  // Handle different potential response structures
-  const root = item.data || item.result || item;
-  
-  // Status mapping as per doc: 1 (Processing), 2 (Completed), 3 (Failed)
-  const status = root.status !== undefined ? Number(root.status) : 1;
-  const percentage = root.status_percentage !== undefined ? Number(root.status_percentage) : (status === 2 ? 100 : 0);
+  // Doc says: status (1: processing, 2: completed, 3: failed)
+  // status_percentage: Progress percentage (0-100)
+  const status = item.status !== undefined ? Number(item.status) : 1;
+  const percentage = item.status_percentage !== undefined ? Number(item.status_percentage) : (status === 2 ? 100 : 0);
 
-  // Extract video info from generated_video array or direct properties
-  const vList = root.generated_video || [];
+  // Extract from generated_video array as per doc
+  const vList = item.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
-  let rawUrl = vData.video_url || vData.video_uri || root.generate_result || "";
-  let rawThumb = vData.thumbnail || vData.last_frame || root.thumbnail_url || "";
+  let rawUrl = vData.video_url || vData.video_uri || item.generate_result || "";
+  let rawThumb = vData.thumbnail || vData.last_frame || item.thumbnail_url || "";
 
   return {
     mediaType: 'video',
-    uuid: root.uuid || root.id || "unknown",
+    uuid: item.uuid || item.id || "unknown",
     url: normalizeUrl(rawUrl),
     thumbnail: normalizeUrl(rawThumb) || "https://i.ibb.co/b5N15CGf/Untitled-design-18.png",
-    prompt: root.input_text || root.prompt || "Sora Generation",
-    timestamp: new Date(root.created_at || Date.now()).getTime(),
+    prompt: item.input_text || item.prompt || "Sora Generation",
+    timestamp: new Date(item.created_at || Date.now()).getTime(),
     status: status as (1 | 2 | 3), 
     status_percentage: percentage,
-    aspectRatio: root.aspect_ratio || vData.aspect_ratio || "16:9",
-    model_name: root.model_name || "sora-2",
-    duration: vData.duration || root.duration || 10
+    aspectRatio: item.aspect_ratio || vData.aspect_ratio || "16:9",
+    model_name: item.model_name || "sora-2",
+    duration: vData.duration || item.duration || 10
   };
 };
 
 /**
  * Fetches video data and converts it to a browser-compatible MP4 blob URL.
+ * Essential for bypass CORS and ensuring preview/download work.
  */
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
   if (!url) return "";
@@ -126,7 +126,6 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
       if (!response.ok) continue;
       
       const blob = await response.blob();
-      // Important: Specifically set the type to video/mp4
       const videoBlob = new Blob([blob], { type: 'video/mp4' });
       return URL.createObjectURL(videoBlob);
     } catch (e) {
@@ -139,7 +138,33 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
 };
 
 /**
- * Prompt Refinement
+ * DO NOT TOUCH - LOCKED BY USER REQUEST
+ */
+export const startVideoGen = async (params: { 
+  prompt: string; 
+  duration?: number; 
+  ratio?: string; 
+  imageFile?: File; 
+}): Promise<any> => {
+  const formData = new FormData();
+  formData.append('prompt', params.prompt);
+  formData.append('model', 'sora-2');
+  formData.append('resolution', 'small');
+  formData.append('duration', String(params.duration || 10));
+  formData.append('aspect_ratio', params.ratio === '16:9' ? 'landscape' : 'portrait');
+  
+  if (params.imageFile) {
+    formData.append('files', params.imageFile);
+  }
+
+  return await uapiFetch('/video-gen/sora', {
+    method: 'POST',
+    body: formData
+  });
+};
+
+/**
+ * DO NOT TOUCH - LOCKED BY USER REQUEST
  */
 export const refinePromptWithAI = async (text: string): Promise<string> => {
   if (!text.trim()) return text;
@@ -156,31 +181,4 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
   } catch (error) {
     return text;
   }
-};
-
-// Fix: Added missing startVideoGen export used in geminiService.ts and SoraStudioView.tsx
-/**
- * Start Video Generation on Geminigen.ai
- */
-export const startVideoGen = async (params: { 
-  prompt: string; 
-  duration?: number; 
-  ratio?: string; 
-  imageFile?: File; 
-}): Promise<any> => {
-  const formData = new FormData();
-  formData.append('input_text', params.prompt);
-  formData.append('duration', String(params.duration || 10));
-  formData.append('aspect_ratio', params.ratio || '16:9');
-  formData.append('model_name', 'sora-2');
-  
-  if (params.imageFile) {
-    formData.append('image_file', params.imageFile);
-  }
-
-  // FormData handling: fetch automatically sets the correct Content-Type and boundary
-  return await uapiFetch('/generate', {
-    method: 'POST',
-    body: formData
-  });
 };
