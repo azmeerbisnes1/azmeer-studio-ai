@@ -1,25 +1,9 @@
+
 import { GeneratedVideo } from "../types.ts";
 import { GoogleGenAI } from "@google/genai";
 
 const GEMINIGEN_API_KEY = "tts-fe9842ffd74cffdf095bb639e1b21a01";
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
-
-export const refinePromptWithAI = async (text: string): Promise<string> => {
-  if (!text.trim()) return text;
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `You are a world-class cinematic director for Sora 2.0. 
-      Transform the following user idea into a highly detailed, visually stunning video prompt. 
-      Return ONLY the refined English prompt.
-      User Idea: ${text}`,
-    });
-    return response.text?.trim() || text;
-  } catch (error) {
-    return text;
-  }
-};
 
 /**
  * Robust fetcher with CORS proxy for Geminigen API calls.
@@ -61,6 +45,26 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
   }
 }
 
+/**
+ * Cinema Prompt Refinement (Gemini 3 Flash)
+ */
+export const refinePromptWithAI = async (text: string): Promise<string> => {
+  if (!text.trim()) return text;
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `You are a world-class cinematic director for Sora 2.0. 
+      Transform the following user idea into a highly detailed, visually stunning video prompt. 
+      Return ONLY the refined English prompt.
+      User Idea: ${text}`,
+    });
+    return response.text?.trim() || text;
+  } catch (error) {
+    return text;
+  }
+};
+
 export const startVideoGen = async (params: { 
   prompt: string, 
   duration: number, 
@@ -78,7 +82,7 @@ export const startVideoGen = async (params: {
     if (params.imageFile instanceof File) {
       formData.append("files", params.imageFile);
     } else {
-      formData.append("file_urls", params.imageFile);
+      formData.append("file_urls", params.imageFile as string);
     }
   }
 
@@ -108,15 +112,18 @@ const normalizeUrl = (url: any): string => {
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
   
-  const root = item.data || item;
+  // Handling the specific response structure from Get Specific Generation History
+  const root = item;
   const vList = root.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
-  let rawUrl = vData.video_url || vData.video_uri || vData.video_link || root.generate_result || "";
-  let rawThumb = vData.last_frame || vData.thumbnail || root.thumbnail_url || "";
-
+  // Status: 1 (Processing), 2 (Completed), 3 (Failed)
   const status = root.status !== undefined ? Number(root.status) : 1;
   const percentage = root.status_percentage !== undefined ? Number(root.status_percentage) : (status === 2 ? 100 : 5);
+
+  // Preference order for video URL: generated_video[0].video_url -> root.generate_result
+  let rawUrl = vData.video_url || vData.video_uri || root.generate_result || "";
+  let rawThumb = vData.last_frame || vData.thumbnail || root.thumbnail_url || "";
 
   return {
     mediaType: 'video',
@@ -135,7 +142,6 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
 
 /**
  * Fetches video data and converts it to a browser-compatible MP4 blob URL.
- * Essential for bypass CORS and 'application/octet-stream' headers.
  */
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
   if (!url) return "";
@@ -151,15 +157,14 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
       if (!response.ok) continue;
       
       const blob = await response.blob();
-      // Ensure browser handles this as a video stream
+      // Ensure the blob is specifically marked as video/mp4 for browser players
       const videoBlob = new Blob([blob], { type: 'video/mp4' });
       return URL.createObjectURL(videoBlob);
     } catch (e) {
-      console.warn(`Proxy attempt failed:`, e);
+      console.warn(`Proxy attempt failed for ${url}:`, e);
       continue;
     }
   }
   
-  console.error("All proxies failed to fetch video as blob.");
   return url; 
 };

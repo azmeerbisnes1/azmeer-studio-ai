@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { GeneratedVideo } from '../types.ts';
 import { fetchVideoAsBlob } from '../services/geminigenService.ts';
@@ -17,7 +18,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
   const isProcessing = status === 1;
   const isFailed = status === 3;
 
-  // Cleanup blob URLs on unmount to avoid memory leaks
   useEffect(() => {
     return () => {
       if (internalSrc && internalSrc.startsWith('blob:')) {
@@ -26,10 +26,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
     };
   }, [internalSrc]);
 
-  /**
-   * Syncs the video data as a local Blob.
-   * This is required for Sora 2.0 URLs that are served as raw file downloads.
-   */
   const establishNeuralLink = async () => {
     if (!isCompleted || !video.url || isLoadingNeural || internalSrc) return null;
     
@@ -43,7 +39,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
         setIsLoadingNeural(false);
         return blobUrl;
       } else {
-        // Fallback to original URL if proxying fails
         setInternalSrc(video.url);
         setIsLoadingNeural(false);
         return video.url;
@@ -56,7 +51,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
     }
   };
 
-  // Pre-sync video on viewport entry for snappier experience
   useEffect(() => {
     if (!isCompleted || internalSrc || isLoadingNeural) return;
 
@@ -72,7 +66,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
 
     if (containerRef.current) observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [isCompleted, internalSrc]);
+  }, [isCompleted, internalSrc, video.url]);
 
   const togglePlay = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -95,7 +89,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
   const handleMouseEnter = () => {
     if (!isCompleted || videoError) return;
     if (videoRef.current && internalSrc) {
-      // Auto-preview on hover with sound muted
       videoRef.current.play().catch(() => {});
     }
   };
@@ -115,8 +108,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
     
     try {
       let downloadUrl = internalSrc && internalSrc.startsWith('blob:') ? internalSrc : null;
-      
-      // If no blob is available yet, fetch one now for a clean download
       if (!downloadUrl) {
         downloadUrl = await fetchVideoAsBlob(video.url);
       }
@@ -128,13 +119,11 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       link.click();
       document.body.removeChild(link);
       
-      // Clean up if it was a temporary download blob
       if (downloadUrl !== internalSrc) {
         setTimeout(() => URL.revokeObjectURL(downloadUrl!), 1000);
       }
     } catch (err) {
       console.error("Download failed:", err);
-      // Fallback for extreme cases
       window.open(video.url, '_blank');
     } finally {
       setTimeout(() => setIsDownloading(false), 2000);
@@ -169,7 +158,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
               src={internalSrc || undefined}
               className={`w-full h-full object-contain transition-opacity duration-700 ${isLoadingNeural ? 'opacity-30' : 'opacity-100'}`} 
               playsInline 
-              muted={!isPlaying} // Mute on preview hover, unmute on active click if you want sound
+              muted={!isPlaying} 
               loop 
               poster={video.thumbnail}
               onPlay={() => setIsPlaying(true)}
@@ -177,12 +166,10 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
               onError={() => !isLoadingNeural && establishNeuralLink()}
             />
             
-            {/* Visual fallback while syncing */}
             {!internalSrc && !isLoadingNeural && (
               <img src={video.thumbnail} alt="Poster" className="absolute inset-0 w-full h-full object-cover opacity-60 grayscale hover:grayscale-0 transition-all duration-500" />
             )}
 
-            {/* Sync Overlay */}
             {isLoadingNeural && (
               <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-black/60 backdrop-blur-sm">
                  <div className="relative w-10 h-10 mb-4">
@@ -193,7 +180,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
               </div>
             )}
             
-            {/* Play Overlay (Desktop) */}
             {isCompleted && !videoError && !isPlaying && !isLoadingNeural && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/5 group-hover:bg-black/30 transition-all pointer-events-none">
                  <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-2xl transition-all group-hover:scale-110 group-hover:bg-cyan-500/20 group-hover:border-cyan-500/30">
@@ -216,13 +202,12 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
              </button>
           </div>
         ) : (
-          /* Processing State */
           <div className="text-center space-y-8 w-full px-12 py-20 bg-slate-950/40">
              <div className="relative w-20 h-20 mx-auto">
                 <div className="absolute inset-0 border-4 border-slate-900 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-t-cyan-500 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 border-4 border-t-cyan-500 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
                 <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-cyan-400 font-orbitron">
-                  {video.status_percentage}%
+                  {video.status_percentage || 0}%
                 </div>
              </div>
              <div className="space-y-2">
@@ -269,7 +254,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
               {isCopying ? 'LINK COPIED' : 'COPY NEURAL'}
             </button>
             <button 
-              onClick={(e) => { e.stopPropagation(); window.open(video.url, '_blank'); }}
+              onClick={(e) => { e.stopPropagation(); if (video.url) window.open(video.url, '_blank'); }}
               disabled={!video.url}
               className="px-4 text-[9px] font-black uppercase text-slate-600 hover:text-cyan-400 transition-all tracking-[0.2em] py-2.5 border border-white/5 rounded-xl hover:bg-white/5"
               title="View Raw Source"

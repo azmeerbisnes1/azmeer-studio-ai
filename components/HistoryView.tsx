@@ -17,6 +17,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
 
   const fetchHistory = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
+    setError(null);
     
     try {
       // 1. Ambil semua UUID yang disimpan oleh user ini dalam Supabase
@@ -29,11 +30,17 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       }
 
       // 2. Dapatkan data terperinci daripada Geminigen untuk setiap UUID
-      const videoDataPromises = userUuids.map(uuid => getSpecificHistory(uuid).catch(() => null));
+      const videoDataPromises = userUuids.map(uuid => 
+        getSpecificHistory(uuid).catch(err => {
+          console.error(`Gagal tarik UUID ${uuid}:`, err);
+          return null;
+        })
+      );
+      
       const rawResults = await Promise.all(videoDataPromises);
       
       const videoItems = rawResults
-        .filter(item => item !== null)
+        .filter(item => item !== null && (item.uuid || item.id))
         .map(item => mapToGeneratedVideo(item))
         .sort((a, b) => b.timestamp - a.timestamp);
           
@@ -42,13 +49,17 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       // 3. Auto-polling jika ada video masih 'Processing' (Status 1)
       const hasActiveTasks = videoItems.some(v => v.status === 1);
       
-      if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
+      if (pollingTimerRef.current) {
+        window.clearTimeout(pollingTimerRef.current);
+        pollingTimerRef.current = null;
+      }
+
       if (hasActiveTasks) {
         pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 8000);
       }
     } catch (err: any) {
       console.error("Sync Error:", err);
-      setError("Gagal menyinkronkan Arkib Video.");
+      setError("Gagal menyelaraskan Arkib Video. Sila cuba lagi.");
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -56,7 +67,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
 
   useEffect(() => {
     fetchHistory(true);
-    return () => { if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current); };
+    return () => { 
+      if (pollingTimerRef.current) window.clearTimeout(pollingTimerRef.current); 
+    };
   }, [fetchHistory]);
 
   return (
@@ -85,14 +98,18 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
         </header>
 
         {error && (
-          <div className="mb-10 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl text-center">
-             <p className="text-red-400 text-xs font-bold uppercase tracking-widest">{error}</p>
+          <div className="mb-10 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl text-center animate-up">
+             <p className="text-red-400 text-xs font-bold uppercase tracking-widest mb-2">Sync Error</p>
+             <p className="text-red-300 text-[10px]">{error}</p>
           </div>
         )}
 
         {history.length === 0 && !loading ? (
           <div className="text-center py-40 border-4 border-dashed border-slate-900/50 rounded-[4rem] bg-slate-900/5 animate-up">
-            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">Tiada rekod video ditemui.</p>
+            <div className="w-20 h-20 bg-slate-900/50 rounded-full flex items-center justify-center mx-auto mb-6">
+               <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" strokeWidth={1}/></svg>
+            </div>
+            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">Tiada rekod video ditemui dalam arkib anda.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 pb-40">
