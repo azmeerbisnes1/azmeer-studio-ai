@@ -96,12 +96,10 @@ const normalizeUrl = (url: any): string => {
   if (!url || typeof url !== 'string') return "";
   let trimmed = url.trim();
   
-  // Detection for absolute URLs (S3, R2, CDN)
   if (trimmed.toLowerCase().startsWith('http://') || trimmed.toLowerCase().startsWith('https://')) {
     return trimmed;
   }
   
-  // Fallback for relative paths from the CDN
   const cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
   if (!cleanPath) return "";
   return `https://cdn.geminigen.ai/${cleanPath}`;
@@ -110,18 +108,12 @@ const normalizeUrl = (url: any): string => {
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
   
-  // Handle direct item vs {data: item}
   const root = item.data || item;
-  
-  // Extract from documentation-compliant structure
   const vList = root.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
-  // API returns video_url or video_uri for the result
-  let rawUrl = vData.video_url || vData.video_uri || root.generate_result || "";
-  
-  // Sora generations typically provide a 'last_frame' for the thumbnail
-  let rawThumb = vData.last_frame || root.thumbnail_url || "";
+  let rawUrl = vData.video_url || vData.video_uri || vData.video_link || root.generate_result || "";
+  let rawThumb = vData.last_frame || vData.thumbnail || root.thumbnail_url || "";
 
   const status = root.status !== undefined ? Number(root.status) : 1;
   const percentage = root.status_percentage !== undefined ? Number(root.status_percentage) : (status === 2 ? 100 : 5);
@@ -141,15 +133,33 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   };
 };
 
+/**
+ * Fetches video data and converts it to a browser-compatible MP4 blob URL.
+ * Essential for bypass CORS and 'application/octet-stream' headers.
+ */
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
-  try {
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
-    const blob = await response.blob();
-    // Explicitly set MIME type to mp4 to bypass octet-stream playback issues
-    const videoBlob = new Blob([blob], { type: 'video/mp4' });
-    return URL.createObjectURL(videoBlob);
-  } catch (e) {
-    return url;
+  if (!url) return "";
+  
+  const proxies = [
+    (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`
+  ];
+
+  for (const proxyFn of proxies) {
+    try {
+      const response = await fetch(proxyFn(url));
+      if (!response.ok) continue;
+      
+      const blob = await response.blob();
+      // Ensure browser handles this as a video stream
+      const videoBlob = new Blob([blob], { type: 'video/mp4' });
+      return URL.createObjectURL(videoBlob);
+    } catch (e) {
+      console.warn(`Proxy attempt failed:`, e);
+      continue;
+    }
   }
+  
+  console.error("All proxies failed to fetch video as blob.");
+  return url; 
 };

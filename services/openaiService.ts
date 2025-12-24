@@ -1,4 +1,3 @@
-
 import { refinePromptWithAI } from "./geminigenService";
 
 /**
@@ -14,7 +13,6 @@ const getApiKey = (passedKey?: string): string => {
     if (manual && manual.trim().length > 0) return manual.trim();
   } catch (e) {}
 
-  // Pengesanan melalui pelbagai punca environment
   const viteKey = "VITE_OPENAI_API_KEY";
   const standardKey = "OPENAI_API_KEY";
 
@@ -38,7 +36,6 @@ const getApiKey = (passedKey?: string): string => {
 const fetchOpenAI = async (apiUrl: string, payload: any, currentKey: string) => {
   const proxies = [
     (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-    (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`,
     (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`
   ];
 
@@ -47,56 +44,30 @@ const fetchOpenAI = async (apiUrl: string, payload: any, currentKey: string) => 
   for (const proxyFn of proxies) {
     try {
       const url = proxyFn(apiUrl);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
-
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${currentKey}`
         },
-        body: JSON.stringify(payload),
-        signal: controller.signal
+        body: JSON.stringify(payload)
       });
 
-      clearTimeout(timeoutId);
-
-      const text = await response.text();
-      let data: any;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        continue; 
-      }
+      const data = await response.json();
 
       if (!response.ok) {
-        const msg = data?.error?.message || "";
-        const code = data?.error?.code || "";
-
-        if (code === "invalid_api_key" || msg.toLowerCase().includes("invalid api key")) {
-          throw new Error("KUNCI DITOLAK: OpenAI mengesahkan kunci API ini tidak sah.");
-        }
-        
-        if (code === "insufficient_quota" || msg.toLowerCase().includes("quota")) {
-          throw new Error("KREDIT HABIS: Kunci ini tiada baki atau sudah tamat tempoh.");
-        }
-
-        lastError = new Error(msg || `Ralat Pelayan (${response.status})`);
+        lastError = new Error(data?.error?.message || `Ralat API: ${response.status}`);
         continue;
       }
 
       return data;
     } catch (error: any) {
-      if (error.message.includes("KUNCI DITOLAK") || error.message.includes("KREDIT HABIS")) {
-        throw error;
-      }
       lastError = error;
-      continue; 
+      continue;
     }
   }
   
-  throw new Error(lastError?.message || "Rangkaian sesak. Sila cuba lagi sebentar.");
+  throw new Error(lastError?.message || "Rangkaian OpenAI sesak.");
 };
 
 export const refinePromptWithOpenAI = async (text: string, manualKey?: string): Promise<string> => {
@@ -109,7 +80,7 @@ export const refinePromptWithOpenAI = async (text: string, manualKey?: string): 
   const payload = {
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: "You are a professional cinematic prompt engineer. Transform the idea into a high-quality video prompt. Return ONLY the refined prompt text in English." },
+      { role: "system", content: "You are a professional cinematic prompt engineer for Sora 2.0. Transform the idea into a high-quality, detailed video prompt. Return ONLY the refined prompt text in English." },
       { role: "user", content: `Refine: ${text}` }
     ],
     temperature: 0.7
@@ -119,7 +90,6 @@ export const refinePromptWithOpenAI = async (text: string, manualKey?: string): 
     const data = await fetchOpenAI("https://api.openai.com/v1/chat/completions", payload, currentKey);
     return data.choices?.[0]?.message?.content?.trim() || text;
   } catch (error: any) {
-    console.warn("OpenAI Failed, trying Gemini backup:", error.message);
     return await refinePromptWithAI(text);
   }
 };
@@ -133,21 +103,42 @@ export const generateUGCPrompt = async (params: {
   const currentKey = getApiKey(params.manualKey);
   
   if (!currentKey || currentKey.length < 10) {
-    throw new Error("Sila masukkan OpenAI API Key untuk fungsi UGC.");
+    throw new Error("Sila masukkan OpenAI API Key di Vercel atau tetapan untuk menggunakan mod UGC.");
   }
 
-  const cta = params.platform === 'tiktok' ? "tekan beg kuning" : "tekan learn more";
-  const desc = params.gender === 'female' ? "Malay woman wearing hijab" : "Malay man";
+  const ctaText = params.platform === 'tiktok' ? "tekan beg kuning sekarang" : "tekan learn more untuk tahu lebih lanjut";
+  const charDesc = params.gender === 'female' 
+    ? "A beautiful 30-year-old Malay woman wearing a stylish modest hijab, looking clean and professional." 
+    : "A handsome 30-year-old Malay man with a polite and friendly influencer look, short neat hair, clean-shaven or light stubble, NO earrings, NO necklaces, NO bracelets, wearing modest smart-casual attire (not shorts).";
 
-  const systemPrompt = `Create a 15s UGC video prompt for Sora 2. Character: ${desc}. Style: Influencer. CTA: "${cta}". Return ONLY the prompt in English with Malay script.`;
+  const systemPrompt = `You are an expert UGC (User Generated Content) Director for Sora 2.0. 
+  Create a detailed 15-second cinematic video prompt based on the user's product/topic.
+  
+  VIDEO STRUCTURE (Mandatory 5-segment breakdown):
+  - 0-3s (Hook): Extreme close-up of ${params.gender === 'male' ? 'the man' : 'the woman'} smiling at camera with the product, energetic start.
+  - 3-6s (Feature): Change angle to over-the-shoulder shot showing the product in action. High-end lifestyle lighting.
+  - 6-9s (Detail): Macro lens focus on the product textures or a key benefit, cinematic bokeh.
+  - 9-12s (Demonstration): Medium shot, character using/holding the product in a natural sunny environment.
+  - 12-15s (CTA): Final shot of the character gesturing towards the screen with the CTA text overlay appearing: "${ctaText}".
+  
+  CHARACTER RULES:
+  ${charDesc}
+  
+  SCRIPT RULES:
+  - Dialogue/Voiceover must be in informal, natural "Bahasa Melayu Malaysia" (santai and ringkas).
+  - The script should be short enough to fit 15 seconds perfectly.
+  - NO subtitles/text on screen except for the CTA at the end.
+  
+  OUTPUT FORMAT:
+  Provide a single, long, highly descriptive English prompt for Sora 2.0 that includes the visual transitions, camera work, environment, character details, and the Malay dialogue for the AI to understand the scene context.`;
 
   const payload = {
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `Topic: ${params.text}` }
+      { role: "user", content: `Product/Topic: ${params.text}` }
     ],
-    temperature: 0.7
+    temperature: 0.8
   };
 
   const data = await fetchOpenAI("https://api.openai.com/v1/chat/completions", payload, currentKey);
