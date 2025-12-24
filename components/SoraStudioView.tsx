@@ -41,11 +41,12 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
       const ugcPrompt = await generateUGCPrompt({
         text: prompt,
         gender: ugcGender,
-        platform: ugcPlatform
+        platform: ugcPlatform,
+        image: imagePreview || undefined
       });
       setPrompt(ugcPrompt);
-      setDuration(15); // UGC is fixed at 15s
-      setAspectRatio('9:16'); // UGC standard for reels/tiktok
+      setDuration(15); // UGC standard 15s
+      setAspectRatio('9:16'); // Optimized for vertical platforms
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -111,8 +112,8 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
           {/* Main Prompt Area */}
           <div className="space-y-4">
             <div className="flex justify-between items-center px-4">
-               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Visual Concept / Product Description</label>
-               {isUGCProcessing && <span className="text-[9px] font-black text-purple-400 animate-pulse uppercase tracking-widest">AI sedang merangka UGC Script...</span>}
+               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Konsep Visual / Penerangan Produk</label>
+               {isUGCProcessing && <span className="text-[9px] font-black text-purple-400 animate-pulse uppercase tracking-widest">GPT-4o-mini Merancang Skrip...</span>}
             </div>
             <div className="relative">
               <textarea 
@@ -127,52 +128,55 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
                   disabled={isRefining || isUGCProcessing || !prompt}
                   className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-2xl text-[9px] font-black uppercase transition-all flex items-center gap-2 border border-white/10"
                 >
-                  {isRefining ? <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"/> : '✨ Refine'}
+                  {isRefining ? <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"/> : '✨ Magic Refine'}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* UGC Generator Controls */}
-          <div className="p-8 rounded-[2.5rem] bg-purple-500/5 border border-purple-500/20 space-y-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-              <h3 className="text-[10px] font-black text-purple-400 uppercase tracking-[0.3em]">UGC Script Generator (OpenAI GPT-4o-mini)</h3>
+          {/* UGC Generator Controls - Highly integrated with Image to Video */}
+          <div className="p-8 rounded-[2.5rem] bg-purple-500/5 border border-purple-500/20 space-y-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]"></div>
+                <h3 className="text-[10px] font-black text-purple-400 uppercase tracking-[0.3em]">UGC Script Optimizer (GPT-4o-mini)</h3>
+              </div>
+              {imagePreview && <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">Image Analysis Active</span>}
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-3">
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Pilih Watak Influencer</p>
+              <div className="space-y-4">
+                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-2">Watak Utama (Influencer)</p>
                 <div className="flex gap-3">
                    <button 
                     onClick={() => setUgcGender('female')}
-                    className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${ugcGender === 'female' ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-900 border-white/5 text-slate-500'}`}
+                    className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${ugcGender === 'female' ? 'bg-purple-600 border-purple-400 text-white shadow-lg' : 'bg-slate-900 border-white/5 text-slate-500'}`}
                    >
-                     Wanita (Berhijab)
+                     Wanita Melayu (Hijab)
                    </button>
                    <button 
                     onClick={() => setUgcGender('male')}
-                    className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${ugcGender === 'male' ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-900 border-white/5 text-slate-500'}`}
+                    className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${ugcGender === 'male' ? 'bg-purple-600 border-purple-400 text-white shadow-lg' : 'bg-slate-900 border-white/5 text-slate-500'}`}
                    >
-                     Lelaki (Sopan)
+                     Lelaki Melayu (Sopan)
                    </button>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Pilih Platform (Auto CTA)</p>
+              <div className="space-y-4">
+                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-2">Platform & CTA</p>
                 <div className="flex gap-3">
                    <button 
                     onClick={() => setUgcPlatform('tiktok')}
-                    className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${ugcPlatform === 'tiktok' ? 'bg-black border-white/20 text-white' : 'bg-slate-900 border-white/5 text-slate-500'}`}
+                    className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${ugcPlatform === 'tiktok' ? 'bg-black border-white/30 text-white' : 'bg-slate-900 border-white/5 text-slate-500'}`}
                    >
-                     TikTok
+                     TikTok Style
                    </button>
                    <button 
                     onClick={() => setUgcPlatform('facebook')}
                     className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${ugcPlatform === 'facebook' ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-900 border-white/5 text-slate-500'}`}
                    >
-                     Facebook
+                     Facebook Ads
                    </button>
                 </div>
               </div>
@@ -181,33 +185,36 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
             <button 
               onClick={handleGenerateUGC}
               disabled={isUGCProcessing || !prompt.trim() || isGenerating}
-              className="w-full py-5 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] transition-all shadow-xl flex items-center justify-center gap-3"
+              className="w-full py-6 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.3em] transition-all shadow-2xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30"
             >
               {isUGCProcessing ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                  <span>Sedang Merangka Skrip UGC...</span>
+                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                  <span>Menganalisis Visual & Skrip...</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                  <span>Bina Skrip UGC Sinematik (15s)</span>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                  <span>Bina Skrip UGC (15s Segment)</span>
                 </>
               )}
             </button>
+            <p className="text-center text-[8px] text-slate-700 font-bold uppercase tracking-widest">
+              Setiap 3 saat sudut kamera berubah secara dinamik. Dialog Bahasa Melayu santai.
+            </p>
           </div>
 
           {/* Media & Settings Area */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-4">
-               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Imej Rujukan (Opsional)</label>
-               <div onClick={() => document.getElementById('v-file')?.click()} className={`aspect-video rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${imagePreview ? 'border-cyan-500/40 bg-black' : 'border-white/5 hover:border-white/10 bg-black/20'}`}>
+               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Imej Rujukan (Image to Video)</label>
+               <div onClick={() => document.getElementById('v-file')?.click()} className={`aspect-video rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all duration-500 ${imagePreview ? 'border-cyan-500/40 bg-black shadow-[0_0_30px_rgba(34,211,238,0.1)]' : 'border-white/5 hover:border-white/10 bg-black/20'}`}>
                   {imagePreview ? (
-                    <img src={imagePreview} className="w-full h-full object-cover rounded-[2rem]" alt="Rujukan"/>
+                    <img src={imagePreview} className="w-full h-full object-cover rounded-[2.5rem] animate-up" alt="Rujukan"/>
                   ) : (
                     <div className="text-center">
-                       <svg className="w-10 h-10 text-slate-800 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" strokeWidth={1}/></svg>
-                       <p className="text-[8px] font-black text-slate-800 uppercase tracking-widest">Upload Imej</p>
+                       <svg className="w-12 h-12 text-slate-800 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" strokeWidth={1}/></svg>
+                       <p className="text-[9px] font-black text-slate-800 uppercase tracking-[0.2em]">Pilih Gambar Permulaan</p>
                     </div>
                   )}
                </div>
@@ -216,19 +223,19 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
 
             <div className="flex flex-col justify-end space-y-6">
                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-600 uppercase ml-2">Durasi</label>
-                    <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="w-full bg-slate-900 border border-white/5 rounded-2xl p-4 text-xs font-bold text-white outline-none">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-600 uppercase ml-2">Durasi Video</label>
+                    <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="w-full bg-slate-900 border border-white/5 rounded-2xl p-4 text-xs font-bold text-white outline-none focus:border-cyan-500/40">
                       <option value={10}>10 SAAT</option>
-                      <option value={15}>15 SAAT</option>
+                      <option value={15}>15 SAAT (UGC)</option>
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-600 uppercase ml-2">Format</label>
-                    <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-slate-900 border border-white/5 rounded-2xl p-4 text-xs font-bold text-white outline-none">
-                      <option value="16:9">LANDSCAPE</option>
-                      <option value="9:16">PORTRAIT</option>
-                      <option value="1:1">SQUARE</option>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-600 uppercase ml-2">Nisbah Aspek</label>
+                    <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-slate-900 border border-white/5 rounded-2xl p-4 text-xs font-bold text-white outline-none focus:border-cyan-500/40">
+                      <option value="9:16">PORTRAIT (Social)</option>
+                      <option value="16:9">LANDSCAPE (Cinema)</option>
+                      <option value="1:1">SQUARE (Post)</option>
                     </select>
                   </div>
                </div>
@@ -236,9 +243,9 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
                <button 
                 onClick={handleGenerate}
                 disabled={isGenerating || !prompt || isQuotaExhausted || isUGCProcessing}
-                className="w-full py-6 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-20 text-white rounded-3xl font-black text-[10px] uppercase tracking-[0.3em] transition-all shadow-2xl active:scale-95"
+                className="w-full py-7 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-20 text-white rounded-[2rem] font-black text-[12px] uppercase tracking-[0.4em] transition-all shadow-2xl active:scale-[0.98] shadow-cyan-900/40"
                >
-                 {isGenerating ? 'MENYAMBUNG NEURAL LINK...' : isQuotaExhausted ? 'KUOTA HABIS' : 'JANA VIDEO SORA 2'}
+                 {isGenerating ? 'Neural Rendering Sora 2.0...' : isQuotaExhausted ? 'HAD KUOTA DICAPAI' : 'JANA VIDEO SEKARANG'}
                </button>
             </div>
           </div>
