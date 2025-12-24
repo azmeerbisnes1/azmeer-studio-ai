@@ -1,39 +1,31 @@
 import { refinePromptWithAI } from "./geminigenService";
 
 /**
- * Mendapatkan API Key OpenAI dengan sokongan pelbagai persekitaran (Vercel/Vite).
- * Memastikan VITE_OPENAI_API_KEY dikesan dengan betul.
+ * Mendapatkan API Key OpenAI dengan sokongan persekitaran Vite/Vercel.
  */
 const getApiKey = (): string => {
-  let key = "";
-  
-  // 1. Periksa process.env (Standard Node/Vercel backend environment)
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      key = process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY || process.env.API_KEY || "";
-    }
-  } catch (e) {}
-
-  // 2. Periksa import.meta.env (Vite frontend environment - Sangat penting untuk Vercel)
-  try {
+  // @ts-ignore - Menggunakan standard Vite untuk akses environment variables
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_OPENAI_API_KEY) {
     // @ts-ignore
-    if (!key && typeof import.meta !== 'undefined' && import.meta.env) {
-      // @ts-ignore
-      key = import.meta.env.VITE_OPENAI_API_KEY || import.meta.env.OPENAI_API_KEY;
-    }
-  } catch (e) {}
-
-  return (key || "").trim();
+    return import.meta.env.VITE_OPENAI_API_KEY.trim();
+  }
+  
+  // Fallback untuk persekitaran Node/Vercel Backend
+  if (typeof process !== 'undefined' && process.env) {
+    return (process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "").trim();
+  }
+  
+  return "";
 };
 
 const fetchOpenAI = async (apiUrl: string, payload: any) => {
   const currentKey = getApiKey();
   
   if (!currentKey) {
-    throw new Error("API Key OpenAI tidak dijumpai. Pastikan anda telah menambah 'VITE_OPENAI_API_KEY' di Environment Variables Vercel dan telah melakukan 'Redeploy'.");
+    throw new Error("API KEY TIDAK DIKESAN: Sila pastikan VITE_OPENAI_API_KEY telah ditambah di Dashboard Vercel dan anda telah klik 'Redeploy'.");
   }
 
-  // Menggunakan proxy untuk mengelakkan ralat CORS
+  // Gunakan proxy untuk mengelakkan ralat CORS di browser
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
 
   try {
@@ -67,35 +59,35 @@ export const generateUGCPrompt = async (params: {
 }): Promise<string> => {
   const ctaText = params.platform === 'tiktok' ? "tekan beg kuning sekarang" : "tekan learn more untuk tahu lebih lanjut";
   
-  const femaleDesc = "A beautiful 30-year-old Malay woman, wearing a clean and stylish modest hijab, looking clean and professional. Charismatic influencer look.";
-  const maleDesc = "A handsome 30-year-old Malay man, polite and well-groomed influencer style, 30s, short neat hair. STRICTLY NO earrings, NO necklaces, NO bracelets, NO rings, and NO shorts. Modest and sophisticated influencer attire.";
+  const femaleDesc = "A beautiful 30-year-old Malay woman, wearing a stylish modest hijab, looking like a professional influencer. Warm and glowing skin tone.";
+  const maleDesc = "A handsome 30-year-old Malay man, polite influencer look, short neat hair. STRICTLY NO earrings, NO necklaces, NO bracelets, NO rings. Modest smart-casual attire.";
   
   const characterRules = params.gender === 'female' ? femaleDesc : maleDesc;
 
-  const systemPrompt = `You are a world-class UGC (User Generated Content) Creative Director for Sora 2.0.
-Your goal is to write a highly detailed 15-second cinematic video prompt based on the product description provided.
+  const systemPrompt = `You are a professional UGC Video Director for Sora 2.0. 
+Create a detailed 15-second cinematic video prompt based on the product description.
 
-STRUCTURE REQUIREMENTS (Total 15 Seconds):
-- DYNAMIC CAMERA: Every 3 seconds, the camera angle and visual style MUST change (Total 5 distinct segments).
-- 0-3s (Hook): Extreme close-up of the character smiling warmly at the camera, holding the product. High energy start.
-- 3-6s (Feature 1): Side view, 45-degree angle. Show character interacting with the product in a premium lifestyle setting.
-- 6-9s (Detail): Macro close-up focus on the product's high-quality texture/details. Cinematic bokeh.
-- 9-12s (Demonstration): Medium shot from a different angle. Character demonstrates a key benefit naturally.
-- 12-15s (CTA): Final camera change to a stable eye-level medium shot. Character gestures towards the screen. CTA TEXT OVERLAY in center: "${ctaText}".
+STRICT VIDEO STRUCTURE (15 SECONDS TOTAL):
+- Change camera angle EXACTLY every 3 seconds (Total 5 angles).
+- 0-3s: [HOOK] Extreme close-up of character smiling and showing the product to camera.
+- 3-6s: [ANGLE 2] Side-profile shot, 45-degree angle, showing the product in use.
+- 6-9s: [ANGLE 3] Macro close-up on the product textures or a key physical detail.
+- 9-12s: [ANGLE 4] Medium shot from a different perspective (low angle), character looking satisfied.
+- 12-15s: [CTA] Eye-level medium shot, character pointing to the screen. ON-SCREEN TEXT: "${ctaText}".
 
-CONTENT RULES:
+RULES:
 - CHARACTER: ${characterRules}
-- DIALOGUE/VOICE: All spoken words MUST be in natural, casual "Bahasa Melayu Malaysia" (Bahasa santai & ringkas).
-- TEXT ON SCREEN: NO subtitles. ONLY the final CTA text overlay during the 12-15s segment.
-- LANGUAGE: Write the technical visual prompt in high-end cinematic English for Sora 2.0, but include the Malay dialogue in the description.
+- DIALOGUE: Any spoken words must be in casual, natural "Bahasa Melayu Malaysia" (Bahasa santai).
+- VISUALS: Write visual descriptions in high-end cinematic English.
+- TEXT: NO subtitles on screen except for the final CTA text.
 
-Return ONLY the full cinematic prompt text for Sora 2.0.`;
+Return ONLY the refined prompt text for Sora 2.0.`;
 
   const payload = {
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `Product Description: ${params.productDesc}` }
+      { role: "user", content: `Generate UGC prompt for: ${params.productDesc}` }
     ],
     temperature: 0.8
   };
@@ -108,7 +100,7 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
   const payload = {
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: "You are a cinematic prompt expert. Improve the user's prompt for Sora 2.0 focusing on realistic details and lighting. Output ONLY the refined prompt in English." },
+      { role: "system", content: "You are a cinematic prompt engineer. Output ONLY the refined version of the user prompt in English for Sora 2.0. Focus on lighting and camera motion." },
       { role: "user", content: text }
     ],
     temperature: 0.7
