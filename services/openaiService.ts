@@ -1,7 +1,8 @@
 
 /**
- * OPENAI SCRIPTING ENGINE (GPT-4o-mini)
+ * OPENAI SCRIPTING ENGINE (GPT-4o-mini) - LOCKED VERSION
  * Specialized for Sora 2.0 UGC Cinema Prompts with Lip-Sync Dialogue
+ * DO NOT MODIFY THE STRUCTURE BELOW.
  */
 
 const getApiKey = (): string => {
@@ -21,7 +22,7 @@ const fetchOpenAI = async (payload: any) => {
   const apiKey = getApiKey();
   
   if (!apiKey) {
-    throw new Error("Konfigurasi Diperlukan: Sila pastikan VITE_OPENAI_API_KEY telah dimasukkan dalam environment Vercel dan anda telah melakukan Redeploy.");
+    throw new Error("Konfigurasi Diperlukan: Sila pastikan VITE_OPENAI_API_KEY telah dimasukkan dalam environment Vercel.");
   }
 
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent("https://api.openai.com/v1/chat/completions")}`;
@@ -50,7 +51,6 @@ export const generateUGCPrompt = async (params: {
 }): Promise<string> => {
   const ctaText = params.platform === 'tiktok' ? "tekan beg kuning sekarang" : "tekan learn more untuk tahu lebih lanjut";
   
-  // Character Descriptions
   const charFemale = "A professional and charismatic 30-year-old Malay woman influencer, wearing a stylish modest hijab and elegant modern clothing. She has a friendly face and warm smile.";
   const charMale = "A polite and professional 30-year-old Malay man, clean-shaven with neat short hair, wearing a smart long-sleeve shirt and long trousers. STRICTLY NO earrings, NO necklaces, NO bracelets, NO rings, and NO shorts. He has a friendly Malaysian influencer vibe.";
   
@@ -96,7 +96,7 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
   const payload = {
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: "You are an expert Sora 2.0 prompt engineer. Transform user input into a cinematic, detailed prompt in English focusing on lighting, camera paths, and high-end textures. Ensure the description implies high-quality lip-sync if dialogue is present." },
+      { role: "system", content: "You are an expert Sora 2.0 prompt engineer. Transform user input into a cinematic, detailed prompt in English focusing on lighting (anamorphic flares, volumetric fog), camera paths (dolly zoom, slow pan), and high-end textures. Ensure the description implies high-quality lip-sync if dialogue is present." },
       { role: "user", content: text }
     ],
     temperature: 0.7

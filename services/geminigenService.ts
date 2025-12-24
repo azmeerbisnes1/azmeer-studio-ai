@@ -1,185 +1,166 @@
 
 import { GeneratedVideo } from "../types.ts";
-import { GoogleGenAI } from "@google/genai";
 
 /**
- * Geminigen API Configuration
+ * Neural API Key Resolver
+ * Mengambil kunci daripada Environment Variables sahaja untuk keselamatan GitHub.
  */
-const GEMINIGEN_API_KEY = "tts-fe9842ffd74cffdf095bb639e1b21a01";
+const getGeminigenKey = (): string => {
+  try {
+    // @ts-ignore
+    const viteKey = import.meta.env?.VITE_GEMINIGEN_API_KEY;
+    if (viteKey) return viteKey.trim();
+  } catch (e) {}
+
+  try {
+    if (typeof process !== 'undefined' && process.env.VITE_GEMINIGEN_API_KEY) {
+      return process.env.VITE_GEMINIGEN_API_KEY.trim();
+    }
+  } catch (e) {}
+
+  // Tiada fallback hardcoded untuk mengelakkan sekatan GitHub
+  return ""; 
+};
+
+const GEMINIGEN_API_KEY = getGeminigenKey();
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
 /**
- * Core Request Engine - Sekarang dengan pemprosesan respons yang lebih agresif
+ * Deep UUID Extractor
  */
+export const extractUuid = (data: any): string | null => {
+  if (!data) return null;
+  if (typeof data === 'string' && data.length > 20) return data;
+  
+  const candidates = [
+    data.uuid, 
+    data.id, 
+    data.data?.uuid, 
+    data.data?.id, 
+    data.item?.uuid,
+    data.result?.uuid,
+    data.data?.item?.uuid
+  ];
+  
+  for (const val of candidates) {
+    if (val && typeof val === 'string' && val.length > 10) return val;
+  }
+
+  try {
+    const str = JSON.stringify(data);
+    const match = str.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    if (match) return match[0];
+  } catch (e) {}
+
+  return null;
+};
+
 export async function uapiFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
-  const targetPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const targetUrl = `${BASE_URL}${targetPath}`;
+  const targetUrl = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
   
   const headers: Record<string, string> = {
     "x-api-key": GEMINIGEN_API_KEY,
     ...((options.headers as any) || {})
   };
 
-  if (!(options.body instanceof FormData)) {
-    headers["Content-Type"] = "application/json";
-    headers["Accept"] = "application/json";
+  if (!GEMINIGEN_API_KEY) {
+    console.warn("Amaran: VITE_GEMINIGEN_API_KEY tidak dijumpai. Sila tetapkan di Environment Variables.");
   }
 
-  // Menggunakan CORS Proxy untuk mengelakkan sekatan browser
-  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
 
   try {
     const response = await fetch(proxyUrl, { ...options, headers });
-    const rawText = await response.text();
+    const resData = await response.json();
     
-    let data: any = null;
-    if (rawText && rawText.trim().length > 0) {
-      try {
-        data = JSON.parse(rawText);
-      } catch (e) {
-        data = { message: rawText };
-      }
-    }
-
     if (!response.ok) {
-      const errorMsg = data?.data?.message || data?.detail || data?.message || `API Error: ${response.status}`;
-      throw new Error(errorMsg);
+      if (response.status === 404) return { status: "ghost", error_code: 404 };
+      const msg = resData?.message || resData?.data?.message || `Error ${response.status}`;
+      throw new Error(msg);
     }
-
-    // Geminigen sering membungkus respons dalam objek 'data'
-    return data;
+    return resData;
   } catch (err: any) {
-    console.error(`[Neural Diagnostic] API Error at ${endpoint}:`, err.message);
+    console.error(`[API Error] ${endpoint}:`, err.message);
     throw err;
   }
 }
 
-/**
- * Get Video Data (Deep Search)
- */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   if (!uuid) return null;
-  // Kita ambil respons penuh untuk dianalisis oleh mapper
-  return await uapiFetch(`/history/${uuid}`);
-};
-
-/**
- * Prompt Refinement (LOCKED: Logik asal dikekalkan)
- */
-export const refinePromptWithAI = async (text: string): Promise<string> => {
-  const key = process.env.API_KEY;
-  if (!text.trim() || !key) return text;
-  
   try {
-    const ai = new GoogleGenAI({ apiKey: key });
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Transform this into a detailed Sora 2.0 cinematic prompt. Output ONLY the prompt: ${text}`,
-    });
-    return response.text?.trim() || text;
-  } catch (error) {
-    return text;
+    const data = await uapiFetch(`/history/${uuid}`);
+    if (data.status === "ghost") return { ...data, uuid };
+    return data;
+  } catch (e) {
+    return { status: "ghost", uuid, prompt: "Menghubungi Server..." };
   }
 };
 
-/**
- * Start Sora Generation
- */
-export const startVideoGen = async (params: { 
-  prompt: string; 
-  duration?: number; 
-  ratio?: string; 
-  imageFile?: File; 
-}): Promise<any> => {
+export const startVideoGen = async (params: { prompt: string; duration?: number; ratio?: string; imageFile?: File; }): Promise<any> => {
   const formData = new FormData();
   formData.append('prompt', params.prompt);
   formData.append('model', 'sora-2');
   formData.append('resolution', 'small');
   formData.append('duration', String(params.duration || 10));
   formData.append('aspect_ratio', params.ratio === '16:9' ? 'landscape' : 'portrait');
-  
-  if (params.imageFile) {
-    formData.append('files', params.imageFile);
-  }
+  if (params.imageFile) formData.append('files', params.imageFile);
 
-  return await uapiFetch('/video-gen/sora', {
-    method: 'POST',
-    body: formData
-  });
+  return await uapiFetch('/video-gen/sora', { method: 'POST', body: formData });
 };
 
-/**
- * URL Sanitizer - Menangani format path relatif atau penuh
- */
 const normalizeUrl = (url: any): string => {
   if (!url || typeof url !== 'string') return "";
-  let trimmed = url.trim();
-  if (trimmed.toLowerCase().startsWith('http')) return trimmed;
-  const cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
-  return `https://cdn.geminigen.ai/${cleanPath}`;
+  if (url.startsWith('http')) return url;
+  return `https://cdn.geminigen.ai/${url.startsWith('/') ? url.substring(1) : url}`;
 };
 
-/**
- * Deep Data Mapper - Mencari data dalam setiap lapisan respons
- */
 export const mapToGeneratedVideo = (raw: any): GeneratedVideo => {
-  // Geminigen respons selalunya: { status: 200, data: { ... } } atau terus { uuid: ... }
   const item = raw?.data || raw;
   
-  if (!item) {
+  if (item.status === "ghost") {
     return {
-      uuid: "unknown",
-      status: 3,
-      prompt: "Data Corrupted",
+      uuid: item.uuid || "unknown",
+      status: 1, 
+      status_percentage: 10,
+      prompt: "Menunggu giliran render di server Geminigen...",
       url: "",
-      timestamp: Date.now()
-    } as GeneratedVideo;
+      timestamp: Date.now(),
+      mediaType: 'video',
+      aspectRatio: "landscape",
+      model_name: "sora-2",
+      duration: 10
+    };
   }
-  
+
   const status = item.status !== undefined ? Number(item.status) : 1;
-  const percentage = item.status_percentage !== undefined ? Number(item.status_percentage) : (status === 2 ? 100 : 0);
-
-  const vList = item.generated_video || [];
-  const vData = vList.length > 0 ? vList[0] : {};
+  const vData = (item.generated_video && item.generated_video[0]) || {};
   
-  const rawUrl = vData.video_url || item.video_url || item.generate_result || "";
-  const rawThumb = vData.last_frame || item.last_frame || item.thumbnail_url || "";
-
   return {
     mediaType: 'video',
     uuid: item.uuid || item.id || "unknown",
-    url: normalizeUrl(rawUrl),
-    thumbnail: normalizeUrl(rawThumb),
-    prompt: item.input_text || item.prompt || "Cinematic Sora Render",
+    url: normalizeUrl(vData.video_url || item.video_url || item.generate_result || ""),
+    thumbnail: normalizeUrl(vData.last_frame || item.last_frame || ""),
+    prompt: item.input_text || item.prompt || "Video Tanpa Tajuk",
     timestamp: new Date(item.created_at || Date.now()).getTime(),
     status: status as (1 | 2 | 3), 
-    status_percentage: percentage,
+    status_percentage: item.status_percentage || (status === 2 ? 100 : 0),
     aspectRatio: vData.aspect_ratio || item.aspect_ratio || "landscape",
     model_name: item.model_name || "sora-2",
     duration: vData.duration || item.duration || 10
   };
 };
 
-/**
- * Fetch Video Blob dengan x-api-key Passthrough
- */
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
   if (!url || !url.startsWith('http')) return url;
-  
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-  
   try {
-    const response = await fetch(proxyUrl, {
-      headers: { "x-api-key": GEMINIGEN_API_KEY }
-    });
-    
-    if (!response.ok) throw new Error(`CDN Access Denied: ${response.status}`);
-    
-    const buffer = await response.arrayBuffer();
-    const blob = new Blob([buffer], { type: 'video/mp4' });
+    const response = await fetch(proxyUrl, { headers: { "x-api-key": GEMINIGEN_API_KEY } });
+    const blob = await response.blob();
     return URL.createObjectURL(blob);
   } catch (e) {
-    console.warn("[Stream Fallback] Using direct URL instead of Blob");
     return url;
   }
 };

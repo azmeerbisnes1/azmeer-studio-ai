@@ -1,63 +1,41 @@
 
 /**
- * Fungsi pengesan env yang sangat agresif untuk Vercel/Vite/Local/Sandbox.
+ * Neural Database Service - v12 Security Updated
  */
 const getEnv = (key: string): string => {
-  const variations = [
-    `VITE_SUPABASE_${key}`,
-    `SUPABASE_${key}`,
-    `NEXT_PUBLIC_SUPABASE_${key}`
-  ];
-
+  const variations = [`VITE_SUPABASE_${key}`, `SUPABASE_${key}`, `NEXT_PUBLIC_SUPABASE_${key}`];
   try {
     // @ts-ignore
     const meta = import.meta.env;
-    if (meta) {
-      for (const v of variations) {
-        if (meta[v]) return meta[v].trim();
-      }
-    }
+    if (meta) { for (const v of variations) { if (meta[v]) return meta[v].trim(); } }
   } catch (e) {}
-
   try {
     if (typeof process !== 'undefined' && process.env) {
-      for (const v of variations) {
-        if (process.env[v]) return process.env[v].trim();
-      }
+      for (const v of variations) { if (process.env[v]) return process.env[v].trim(); }
     }
   } catch (e) {}
-
-  try {
-    const local = localStorage.getItem(`AZMEER_SUPABASE_${key}`);
-    if (local) return local.trim();
-  } catch (e) {}
-
-  return "";
+  return localStorage.getItem(`AZMEER_SUPABASE_${key}`)?.trim() || "";
 };
 
 let SUPABASE_URL = getEnv('URL');
 let SUPABASE_ANON_KEY = getEnv('ANON_KEY');
 
-// Helper to safely handle strings
 const safeLower = (str: any) => (str ? String(str).toLowerCase().trim() : "");
 
+// LocalStorage Fallback Key
+const LOCAL_UUID_KEY = (userId: string) => `azmeer_local_uuids_${safeLower(userId)}`;
+
 export const db = {
-  isReady: () => {
-    return !!(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith('http'));
-  },
+  isReady: () => !!(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith('http')),
 
   setManualKeys: (url: string, key: string) => {
     localStorage.setItem('AZMEER_SUPABASE_URL', url.trim());
     localStorage.setItem('AZMEER_SUPABASE_ANON_KEY', key.trim());
-    SUPABASE_URL = url.trim();
-    SUPABASE_ANON_KEY = key.trim();
     window.location.reload();
   },
 
   request: async (path: string, options: RequestInit = {}) => {
-    if (!db.isReady()) {
-      return { error: `Konfigurasi Supabase tidak lengkap.` };
-    }
+    if (!db.isReady()) return { error: "Supabase belum di-config." };
     
     const headers = {
       'apikey': SUPABASE_ANON_KEY,
@@ -67,53 +45,38 @@ export const db = {
     };
 
     try {
-      const baseUrl = SUPABASE_URL.replace(/\/+$/, "");
-      const url = `${baseUrl}/rest/v1/${path}`;
-      
+      const url = `${SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/${path}`;
       const response = await fetch(url, { ...options, headers });
       const rawText = await response.text();
-      let data: any = null;
-      
-      if (rawText && rawText.trim().length > 0) {
-        try {
-          data = JSON.parse(rawText);
-        } catch (e) {
-          data = { message: rawText };
-        }
-      }
+      let data = rawText ? JSON.parse(rawText) : { success: true };
 
       if (!response.ok) {
-        return { error: data?.message || `Ralat API: ${response.status}` };
+        if (data?.code === 'PGRST116' || data?.message?.includes('not found')) {
+          return { error: `Table '${path.split('?')[0]}' tidak wujud dalam Supabase anda.`, isTableMissing: true };
+        }
+        return { error: data?.message || `HTTP ${response.status}` };
       }
-
-      return data || { success: true };
-    } catch (e: any) {
-      return { error: "Gagal menyambung ke Supabase." };
+      return data;
+    } catch (e) {
+      return { error: "Network Error: Gagal menyambung ke Supabase." };
     }
   },
 
   saveUser: async (username: string, password: string, userData: any) => {
-    if (!username) return { error: "Username diperlukan." };
     return await db.request('azmeer_users', {
       method: 'POST',
       headers: { 'Prefer': 'return=representation' },
-      body: JSON.stringify({ 
-        username: safeLower(username), 
-        password, 
-        data: userData 
-      })
+      body: JSON.stringify({ username: safeLower(username), password, data: userData })
     });
   },
 
   getUser: async (username: string) => {
-    if (!username) return null;
     const data = await db.request(`azmeer_users?username=eq.${safeLower(username)}&select=*`);
     if (data?.error) return data;
     return Array.isArray(data) && data.length > 0 ? data[0] : null;
   },
 
   updateUser: async (username: string, userData: any) => {
-    if (!username) return { error: "Username diperlukan." };
     return await db.request(`azmeer_users?username=eq.${safeLower(username)}`, {
       method: 'PATCH',
       body: JSON.stringify({ data: userData })
@@ -122,16 +85,43 @@ export const db = {
 
   saveUuid: async (userId: string, uuid: string) => {
     if (!userId || !uuid) return;
+    const uid = safeLower(userId);
+    
+    console.log(`[Database] Menyimpan UUID: ${uuid} untuk user: ${uid}`);
+
+    // 1. Simpan ke LocalStorage (Kecemasan/Pantas)
+    try {
+      const localData = JSON.parse(localStorage.getItem(LOCAL_UUID_KEY(uid)) || "[]");
+      if (!localData.includes(uuid)) {
+        localData.push(uuid);
+        localStorage.setItem(LOCAL_UUID_KEY(uid), JSON.stringify(localData));
+      }
+    } catch (e) {}
+
+    // 2. Simpan ke Supabase (Cloud)
     return await db.request('azmeer_uuids', {
       method: 'POST',
-      body: JSON.stringify({ user_id: safeLower(userId), uuid: uuid })
+      body: JSON.stringify({ user_id: uid, uuid: uuid })
     });
   },
 
   getUuids: async (userId: string) => {
     if (!userId) return [];
-    const data = await db.request(`azmeer_uuids?user_id=eq.${safeLower(userId)}&select=uuid`);
-    return Array.isArray(data) ? data.map((d: any) => d.uuid) : [];
+    const uid = safeLower(userId);
+    
+    // Ambil dari LocalStorage dahulu (Sentiasa ada backup)
+    let localUuids: string[] = [];
+    try {
+      localUuids = JSON.parse(localStorage.getItem(LOCAL_UUID_KEY(uid)) || "[]");
+    } catch (e) {}
+
+    // Ambil dari Supabase (Master data)
+    const cloudData = await db.request(`azmeer_uuids?user_id=eq.${uid}&select=uuid`);
+    const cloudUuids = Array.isArray(cloudData) ? cloudData.map((d: any) => d.uuid) : [];
+
+    // Gabungkan dan buang duplicate
+    const combined = Array.from(new Set([...localUuids, ...cloudUuids]));
+    return combined;
   },
 
   getAllUsers: async () => {
