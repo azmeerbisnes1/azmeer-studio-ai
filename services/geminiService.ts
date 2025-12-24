@@ -2,8 +2,8 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
 // Re-export video services from geminigen
+// Removed getAllHistory as it is not exported by geminigenService.ts
 export { 
-  getAllHistory, 
   getSpecificHistory, 
   fetchVideoAsBlob, 
   mapToGeneratedVideo,

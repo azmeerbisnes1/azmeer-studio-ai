@@ -23,8 +23,7 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
 };
 
 /**
- * Robust fetcher with CORS proxy fallbacks.
- * CORSProxy.io is usually very good with x-api-key headers.
+ * Robust fetcher with CORS proxy.
  */
 export async function uapiFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
   const targetPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -36,15 +35,10 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
     ...((options.headers as any) || {})
   };
 
-  // We primarily use corsproxy.io as it handles headers best for Geminigen
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
 
   try {
-    const response = await fetch(proxyUrl, { 
-      ...options, 
-      headers 
-    });
-
+    const response = await fetch(proxyUrl, { ...options, headers });
     const rawText = await response.text();
     let data: any = null;
     
@@ -63,7 +57,7 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
 
     return data;
   } catch (err: any) {
-    console.error("Geminigen API Connection Error:", err.message);
+    console.error("Geminigen API Error:", err.message);
     throw err;
   }
 }
@@ -95,49 +89,42 @@ export const startVideoGen = async (params: {
   });
 }
 
-export const getAllHistory = async (page: number = 1, limit: number = 50): Promise<any> => {
-  return await uapiFetch(`/histories?page=${page}&items_per_page=${limit}`);
-};
-
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   return await uapiFetch(`/history/${uuid}`);
 };
 
-export const fetchVideoAsBlob = async (url: string): Promise<string> => {
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return URL.createObjectURL(blob);
-  } catch (e) {
-    return url;
-  }
+const normalizeUrl = (url: any): string => {
+  if (!url || typeof url !== 'string') return "";
+  let trimmed = url.trim();
+  // If it's already a full URL, return it
+  if (trimmed.startsWith('http')) return trimmed;
+  // Remove leading slash if any
+  const cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+  // If path is empty after cleaning
+  if (!cleanPath) return "";
+  return `https://cdn.geminigen.ai/${cleanPath}`;
 };
 
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
   
-  // Data detail biasanya berada dalam root atau property .data
+  // Data detail might be at root or under .data property
   const root = item.data || item;
   
-  // Geminigen API meletakkan maklumat media dalam array generated_video
+  // History API returns results in 'generated_video' array
   const vList = root.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
-  // Mencari URL video (video_url atau video_uri)
+  // Priority for Video URL:
+  // 1. video_url from generated_video array (absolute)
+  // 2. video_uri from generated_video array (relative)
+  // 3. generate_result from root (fallback absolute/relative)
   let rawUrl = vData.video_url || vData.video_uri || root.generate_result || "";
   
-  // Baiki URL jika ia relative path (cth: videos/xyz.mp4)
-  if (rawUrl && typeof rawUrl === 'string' && !rawUrl.startsWith('http')) {
-     const cleanPath = rawUrl.startsWith('/') ? rawUrl.substring(1) : rawUrl;
-     rawUrl = `https://cdn.geminigen.ai/${cleanPath}`;
-  }
-
-  // Handle thumbnail URL
-  let thumbUrl = vData.last_frame || root.thumbnail_url || "";
-  if (thumbUrl && typeof thumbUrl === 'string' && !thumbUrl.startsWith('http')) {
-    const cleanPath = thumbUrl.startsWith('/') ? thumbUrl.substring(1) : thumbUrl;
-    thumbUrl = `https://cdn.geminigen.ai/${cleanPath}`;
-  }
+  // Priority for Thumbnail:
+  // 1. last_frame from generated_video (relative/absolute)
+  // 2. thumbnail_url from root (relative/absolute)
+  let rawThumb = vData.last_frame || root.thumbnail_url || "";
 
   const status = root.status !== undefined ? Number(root.status) : 1;
   const percentage = root.status_percentage !== undefined ? Number(root.status_percentage) : (status === 2 ? 100 : 5);
@@ -145,8 +132,8 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   return {
     mediaType: 'video',
     uuid: root.uuid || root.id || "unknown",
-    url: typeof rawUrl === 'string' ? rawUrl : "",
-    thumbnail: thumbUrl || "https://i.ibb.co/b5N15CGf/Untitled-design-18.png",
+    url: normalizeUrl(rawUrl),
+    thumbnail: normalizeUrl(rawThumb) || "https://i.ibb.co/b5N15CGf/Untitled-design-18.png",
     prompt: root.input_text || root.prompt || "Sora Generation",
     timestamp: new Date(root.created_at || Date.now()).getTime(),
     status: status as (1 | 2 | 3), 
@@ -155,4 +142,15 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
     model_name: root.model_name || "sora-2",
     duration: vData.duration || root.duration || 10
   };
+};
+
+export const fetchVideoAsBlob = async (url: string): Promise<string> => {
+  try {
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl);
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  } catch (e) {
+    return url;
+  }
 };
