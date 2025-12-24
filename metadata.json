@@ -3,6 +3,7 @@
   "description": "Premium Sora 2.0 Cinematic Generator and Neural Archive.",
   "requestFramePermissions": [
     "camera",
-    "microphone"
+    "microphone",
+    "geolocation"
   ]
 }
