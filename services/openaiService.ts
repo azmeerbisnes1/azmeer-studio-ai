@@ -3,37 +3,39 @@ import { refinePromptWithAI } from "./geminigenService";
 
 /**
  * PENGESANAN API KEY OPENAI
- * Membersihkan kunci daripada sebarang karakter "invisible" atau ruang yang tidak diingini.
  */
 const getApiKey = (passedKey?: string): string => {
-  let rawKey = "";
   if (typeof passedKey === 'string' && passedKey.trim().length > 0) {
-    rawKey = passedKey;
-  } else {
-    try {
-      rawKey = (localStorage.getItem('azmeer_manual_openai_key') || "").trim();
-    } catch (e) {
-      console.warn("LocalStorage blocked");
-    }
+    return passedKey.trim();
   }
 
-  if (!rawKey) {
-    try {
-      // Fix: Access env through type assertion to avoid Property 'env' does not exist on type 'ImportMeta'
-      rawKey = ((import.meta as any).env?.VITE_OPENAI_API_KEY || (process.env as any)?.VITE_OPENAI_API_KEY || "").trim();
-    } catch (e) {}
-  }
-  
-  // Pembersihan Agresif
-  return rawKey
-    .replace(/[\u0000-\u001F\u007F-\u009F\u00AD\u200B-\u200D\uFEFF]/g, "") 
-    .replace(/["']/g, "") 
-    .replace(/\s+/g, "") 
-    .trim();
+  try {
+    const manual = localStorage.getItem('azmeer_manual_openai_key');
+    if (manual && manual.trim().length > 0) return manual.trim();
+  } catch (e) {}
+
+  // Pengesanan melalui pelbagai punca environment
+  const viteKey = "VITE_OPENAI_API_KEY";
+  const standardKey = "OPENAI_API_KEY";
+
+  try {
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+      const v = (import.meta as any).env[viteKey] || (import.meta as any).env[standardKey];
+      if (v) return v.trim();
+    }
+  } catch (e) {}
+
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      const v = process.env[viteKey] || process.env[standardKey];
+      if (v) return v.trim();
+    }
+  } catch (e) {}
+
+  return "";
 };
 
 const fetchOpenAI = async (apiUrl: string, payload: any, currentKey: string) => {
-  // corsproxy.io adalah yang paling telus untuk header Authorization
   const proxies = [
     (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
     (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`,
@@ -65,16 +67,15 @@ const fetchOpenAI = async (apiUrl: string, payload: any, currentKey: string) => 
       try {
         data = JSON.parse(text);
       } catch (e) {
-        continue; // Cuba proxy lain jika bukan JSON
+        continue; 
       }
 
       if (!response.ok) {
         const msg = data?.error?.message || "";
         const code = data?.error?.code || "";
 
-        // Pengesahan Ralat OpenAI Sebenar
-        if (code === "invalid_api_key" || msg.toLowerCase().includes("invalid api key") || msg.toLowerCase().includes("incorrect api key")) {
-          throw new Error("KUNCI DITOLAK: OpenAI mengesahkan kunci API ini tidak sah. Sila salin semula kunci 'sk-...' yang betul.");
+        if (code === "invalid_api_key" || msg.toLowerCase().includes("invalid api key")) {
+          throw new Error("KUNCI DITOLAK: OpenAI mengesahkan kunci API ini tidak sah.");
         }
         
         if (code === "insufficient_quota" || msg.toLowerCase().includes("quota")) {
@@ -101,7 +102,6 @@ const fetchOpenAI = async (apiUrl: string, payload: any, currentKey: string) => 
 export const refinePromptWithOpenAI = async (text: string, manualKey?: string): Promise<string> => {
   const currentKey = getApiKey(manualKey);
   
-  // Jika tiada kunci, guna Gemini secara senyap
   if (!currentKey || currentKey.length < 10) {
     return await refinePromptWithAI(text);
   }
@@ -133,7 +133,7 @@ export const generateUGCPrompt = async (params: {
   const currentKey = getApiKey(params.manualKey);
   
   if (!currentKey || currentKey.length < 10) {
-    throw new Error("Sila masukkan OpenAI API Key di terminal untuk fungsi UGC.");
+    throw new Error("Sila masukkan OpenAI API Key untuk fungsi UGC.");
   }
 
   const cta = params.platform === 'tiktok' ? "tekan beg kuning" : "tekan learn more";

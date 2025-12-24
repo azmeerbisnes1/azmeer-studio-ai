@@ -19,9 +19,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsProcessing(true);
     setError('');
 
-    // Semakan Diagnostic
+    // Semakan Diagnostic - Jika database tidak sedia, berikan amaran jelas
     if (!db.isReady()) {
-      setError('SISTEM OFFLINE: Environment Variables (VITE_SUPABASE_URL/KEY) tidak dikesan. Sila hubungi admin.');
+      setError('AMARAN: Sistem database tidak dikesan. Sila pastikan VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY telah dimasukkan ke dalam Dashboard Vercel.');
       setIsProcessing(false);
       return;
     }
@@ -45,8 +45,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         picture: "https://api.dicebear.com/7.x/bottts/svg?seed=azmeer", 
         password: formData.password 
       };
-      await db.saveUser(adminData.username, adminData.password, adminData);
-      onLogin(adminData);
+      try {
+        await db.saveUser(adminData.username, adminData.password, adminData);
+        onLogin(adminData);
+      } catch (err) {
+        onLogin(adminData); // Masuk juga sebagai fallback
+      }
       return;
     }
 
@@ -68,16 +72,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           setIsProcessing(false);
         }
       } catch (err) {
-        setError('Ralat sambungan database. Sila cuba lagi.');
+        setError('Ralat sambungan database. Sila semak status Supabase anda.');
         setIsProcessing(false);
       }
     } else {
       try {
         const existing = await db.getUser(cleanUsername);
-        
-        // existing === null boleh bermaksud user tak wujud ATAU connection mati
-        // Jika connection mati, supabaseRequest return null.
-        // Kita assume connection okay jika db.isReady() lepas.
         
         if (existing) { 
           setError('ID Pengguna ini sudah didaftarkan.'); 
@@ -105,7 +105,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         if (res) {
           onLogin(newUser);
         } else {
-          setError('Gagal mendaftar ke pangkalan data. Sila pastikan Table Table azmeer_users wujud di Supabase.');
+          setError('Gagal mendaftar. Sila pastikan Table azmeer_users telah dicipta di Supabase.');
           setIsProcessing(false);
         }
       } catch (err) {
