@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { startVideoGen, refinePromptWithAI } from '../services/geminigenService.ts';
 import { generateUGCPrompt } from '../services/openaiService.ts';
@@ -29,9 +30,14 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
   const handleMagicRefine = async () => {
     if (!prompt.trim() || isRefining) return;
     setIsRefining(true);
-    const refined = await refinePromptWithAI(prompt);
-    setPrompt(refined);
-    setIsRefining(false);
+    try {
+      const refined = await refinePromptWithAI(prompt);
+      setPrompt(refined);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRefining(false);
+    }
   };
 
   const handleGenerateUGC = async () => {
@@ -45,10 +51,10 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
         imageRef: imagePreview || undefined
       });
       setPrompt(ugcPrompt);
-      setDuration(15); // UGC standard 15s
-      setAspectRatio('9:16'); // Optimized for social media
+      setDuration(15);
+      setAspectRatio('9:16');
     } catch (e: any) {
-      alert("Gagal menjana skrip: " + e.message);
+      alert(e.message);
     } finally {
       setIsUGCProcessing(false);
     }
@@ -97,7 +103,7 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
       <div className="max-w-4xl mx-auto space-y-12 pb-24">
         <header className="text-center space-y-4">
           <div className="inline-block px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[9px] font-black text-cyan-400 uppercase tracking-widest">
-            Sora 2.0 UGC Cinema Engine
+            OpenAI GPT-4o-mini Scripting Active
           </div>
           <h2 className="text-6xl md:text-8xl font-black text-white tracking-tighter uppercase leading-none">
             Video <span className="text-cyan-500">Studio</span>
@@ -107,19 +113,18 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
           </p>
         </header>
 
-        <div className="glass-panel p-8 md:p-12 rounded-[3.5rem] border border-white/5 space-y-10">
+        <div className="glass-panel p-8 md:p-12 rounded-[3.5rem] border border-white/5 space-y-10 shadow-2xl">
           
-          {/* Main Prompt Area */}
           <div className="space-y-4">
             <div className="flex justify-between items-center px-4">
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Penerangan Produk / Idea Iklan</label>
-               {isUGCProcessing && <span className="text-[9px] font-black text-purple-400 animate-pulse uppercase tracking-widest">GPT-4o-mini Merangka Skrip...</span>}
+               {isUGCProcessing && <span className="text-[9px] font-black text-cyan-400 animate-pulse uppercase tracking-widest">GPT-4o Merangka Skrip...</span>}
             </div>
             <div className="relative">
               <textarea 
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Tulis penerangan produk anda di sini untuk dijadikan video UGC sinematik..."
+                placeholder="Tulis idea iklan anda..."
                 className="w-full bg-black/40 border border-white/10 rounded-[2.5rem] p-8 text-xl md:text-2xl font-bold text-white outline-none focus:border-cyan-500/50 transition-all min-h-[200px] resize-none"
               />
               <div className="absolute bottom-6 right-6 flex gap-3">
@@ -134,12 +139,11 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
             </div>
           </div>
 
-          {/* UGC Control Panel */}
           <div className="p-8 rounded-[2.5rem] bg-indigo-500/[0.03] border border-indigo-500/20 space-y-8 shadow-inner">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]"></div>
-                <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">UGC Script Engine (GPT-4o-mini)</h3>
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]"></div>
+                <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em]">OpenAI Script Engine (GPT-4o)</h3>
               </div>
             </div>
             
@@ -163,19 +167,19 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
               </div>
 
               <div className="space-y-4">
-                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-2">Destinasi Iklan (CTA)</p>
+                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-2">Platform Iklan</p>
                 <div className="flex gap-2">
                    <button 
                     onClick={() => setUgcPlatform('tiktok')}
                     className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase transition-all border ${ugcPlatform === 'tiktok' ? 'bg-black border-white/30 text-white shadow-lg' : 'bg-slate-900/50 border-white/5 text-slate-500'}`}
                    >
-                     TikTok Style
+                     TikTok
                    </button>
                    <button 
                     onClick={() => setUgcPlatform('facebook')}
                     className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase transition-all border ${ugcPlatform === 'facebook' ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : 'bg-slate-900/50 border-white/5 text-slate-500'}`}
                    >
-                     Facebook Ads
+                     Facebook
                    </button>
                 </div>
               </div>
@@ -184,26 +188,22 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
             <button 
               onClick={handleGenerateUGC}
               disabled={isUGCProcessing || !prompt.trim() || isGenerating}
-              className="w-full py-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.4em] transition-all shadow-2xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30"
+              className="w-full py-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.4em] transition-all shadow-2xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30"
             >
               {isUGCProcessing ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                  <span>Sedang Menganalisis Skrip...</span>
+                  <span>GPT-4o Sedang Menjana...</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                  <span>Bina Skrip UGC Sinematik (15s)</span>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  <span>Bina Skrip UGC (GPT-4o-mini)</span>
                 </>
               )}
             </button>
-            <p className="text-center text-[8px] text-slate-700 font-bold uppercase tracking-widest">
-              Setiap 3 saat sudut kamera berubah secara automatik. Karakter Melayu 30-an.
-            </p>
           </div>
 
-          {/* Media Controls */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-4">
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Imej Rujukan / Produk</label>
@@ -232,9 +232,8 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-slate-600 uppercase ml-2">Nisbah Aspek</label>
                     <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)} className="w-full bg-slate-900 border border-white/5 rounded-2xl p-4 text-xs font-bold text-white outline-none focus:border-cyan-500/40">
-                      <option value="9:16">PORTRAIT (Reels/TikTok)</option>
-                      <option value="16:9">LANDSCAPE (Youtube)</option>
-                      <option value="1:1">SQUARE (Post)</option>
+                      <option value="9:16">PORTRAIT</option>
+                      <option value="16:9">LANDSCAPE</option>
                     </select>
                   </div>
                </div>
@@ -242,9 +241,9 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onU
                <button 
                 onClick={handleGenerate}
                 disabled={isGenerating || !prompt || isQuotaExhausted || isUGCProcessing}
-                className="w-full py-7 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-20 text-white rounded-[2rem] font-black text-[12px] uppercase tracking-[0.4em] transition-all shadow-2xl active:scale-[0.98] shadow-cyan-900/40"
+                className="w-full py-7 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-20 text-white rounded-[2rem] font-black text-[12px] uppercase tracking-[0.4em] transition-all shadow-2xl shadow-cyan-900/40"
                >
-                 {isGenerating ? 'Neural Rendering Sora 2.0...' : isQuotaExhausted ? 'HAD KUOTA DICAPAI' : 'JANA VIDEO SEKARANG'}
+                 {isGenerating ? 'Rendering Sora 2.0...' : isQuotaExhausted ? 'HAD KUOTA DICAPAI' : 'JANA VIDEO SEKARANG'}
                </button>
             </div>
           </div>
