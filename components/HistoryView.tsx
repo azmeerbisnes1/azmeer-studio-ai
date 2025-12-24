@@ -15,31 +15,40 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
   const [error, setError] = useState<string | null>(null);
   const pollingTimerRef = useRef<number | null>(null);
 
+  /**
+   * Menyelaraskan sejarah pengguna dengan menarik status real-time dari Geminigen.ai.
+   */
   const fetchHistory = useCallback(async (showLoading = true) => {
     if (!user || !user.username) {
       setLoading(false);
       return;
     }
+
     if (showLoading) setLoading(true);
     setError(null);
+    
     try {
+      // 1. Ambil semua UUID yang tersimpan dalam arkib Supabase untuk user ini
       const userUuids = await db.getUuids(user.username);
+      
       if (!userUuids || userUuids.length === 0) {
         setHistory([]);
         setLoading(false);
         return;
       }
 
-      // Deep Polling: Ambil status real-time terus dari Geminigen.ai untuk setiap UUID
+      // 2. Fetch live status terus dari Geminigen.ai untuk setiap UUID.
+      // Ini memastikan kita mendapat data status_percentage (0-100) yang tepat.
       const videoDataPromises = userUuids.map(uuid => 
         getSpecificHistory(uuid).catch(err => {
-          console.error(`Sync error for node ${uuid}:`, err);
+          console.error(`Ralat pautan pada node ${uuid}:`, err);
           return null;
         })
       );
       
       const rawResults = await Promise.all(videoDataPromises);
       
+      // 3. Map respons kepada model data UI dan susun mengikut masa terbaru
       const videoItems = rawResults
         .filter(item => item !== null && (item.uuid || item.id))
         .map(item => mapToGeneratedVideo(item))
@@ -47,19 +56,21 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
           
       setHistory(videoItems);
 
-      // Intelligence: Jika ada video yang masih 'Processing' (Status 1), set timer untuk refresh
+      // 4. Intelligence Polling: Jika ada video yang masih 'Processing' (Status 1)
       const hasActiveTasks = videoItems.some(v => Number(v.status) === 1);
+      
       if (pollingTimerRef.current) {
         window.clearTimeout(pollingTimerRef.current);
         pollingTimerRef.current = null;
       }
 
       if (hasActiveTasks) {
-        // Poll setiap 5 saat untuk kemaskini peratusan (%)
+        // Poll setiap 5 saat untuk kemaskini peratusan (%) secara real-time
         pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 5000);
       }
     } catch (err: any) {
-      setError("Gagal menyelaraskan Arkib Sora dengan server pusat.");
+      console.error("Neural Vault Sync Error:", err);
+      setError("Gagal menyelaraskan Arkib Sora dengan server pusat Geminigen.");
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -82,12 +93,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
               <p className="text-cyan-500 text-[10px] font-black uppercase tracking-[0.5em]">Neural Archive Vault</p>
             </div>
             <h2 className="text-5xl md:text-7xl font-black text-white tracking-tighter uppercase leading-none">
-              Cinema <span className="text-slate-900 stroke-text">History</span>
+              Cinema <span className="text-slate-900 stroke-text">Vault</span>
             </h2>
           </div>
           <div className="flex items-center gap-6">
              <div className="hidden sm:flex flex-col items-end">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Links</p>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Processes</p>
                 <p className="text-xl font-black text-cyan-400 font-orbitron">
                   {history.filter(v => Number(v.status) === 1).length}
                 </p>
@@ -116,7 +127,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
             <div className="w-20 h-20 bg-slate-900/50 rounded-full flex items-center justify-center mx-auto mb-6">
                <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" strokeWidth={1}/></svg>
             </div>
-            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">No records found in the vault.</p>
+            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">Tiada rekod dalam arkib sora anda.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 pb-40">
