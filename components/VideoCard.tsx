@@ -8,7 +8,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
   const [videoError, setVideoError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [internalSrc, setInternalSrc] = useState<string | null>(null);
-  const [isLoadingNeural, setIsLoadingNeural] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const status = Number(video.status);
@@ -17,39 +17,35 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
   const isFailed = status === 3;
   const progress = video.status_percentage || 0;
 
-  // Automatik 'Neural Link' (Blob Fetching) apabila status tamat
   useEffect(() => {
-    let active = true;
-    if (isCompleted && !internalSrc && !isLoadingNeural && video.url) {
-       establishNeuralLink(active);
+    let isMounted = true;
+    
+    if (isCompleted && video.url && !internalSrc && !isSyncing) {
+      const syncVideo = async () => {
+        setIsSyncing(true);
+        try {
+          const blobUrl = await fetchVideoAsBlob(video.url);
+          if (isMounted) {
+            setInternalSrc(blobUrl);
+            setVideoError(false);
+          }
+        } catch (err) {
+          console.warn("[Player Sync Failed]", err);
+          if (isMounted) setVideoError(true);
+        } finally {
+          if (isMounted) setIsSyncing(false);
+        }
+      };
+      syncVideo();
     }
+
     return () => {
-      active = false;
+      isMounted = false;
       if (internalSrc && internalSrc.startsWith('blob:')) {
         URL.revokeObjectURL(internalSrc);
       }
     };
   }, [video.uuid, isCompleted, video.url]);
-
-  const establishNeuralLink = async (active: boolean = true) => {
-    if (!isCompleted || !video.url || isLoadingNeural) return;
-    setIsLoadingNeural(true);
-    setVideoError(false);
-    try {
-      // Kita fetch blob untuk atasi masalah octet-stream
-      const blobUrl = await fetchVideoAsBlob(video.url);
-      if (active) {
-        setInternalSrc(blobUrl);
-        setIsLoadingNeural(false);
-      }
-    } catch (err) {
-      if (active) {
-        console.error("Neural Sync Failed:", err);
-        setVideoError(true);
-        setIsLoadingNeural(false);
-      }
-    }
-  };
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -57,7 +53,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
     
     setIsDownloading(true);
     try {
-      // Sentiasa muat turun fail sebagai .mp4 yang betul melalui Blob
       const downloadUrl = internalSrc && internalSrc.startsWith('blob:') 
         ? internalSrc 
         : await fetchVideoAsBlob(video.url);
@@ -69,6 +64,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       link.click();
       document.body.removeChild(link);
     } catch (err) {
+      // Fallback: buka URL asal di tab baru jika Blob gagal
       window.open(video.url, '_blank');
     } finally {
       setIsDownloading(false);
@@ -77,13 +73,12 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isCompleted || videoError) return;
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play().catch(() => setVideoError(true));
-      } else {
-        videoRef.current.pause();
-      }
+    if (!isCompleted || !videoRef.current) return;
+    
+    if (videoRef.current.paused) {
+      videoRef.current.play().catch(() => setVideoError(true));
+    } else {
+      videoRef.current.pause();
     }
   };
 
@@ -92,30 +87,41 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       onClick={togglePlay}
       className={`glass-panel rounded-[2.5rem] overflow-hidden group border transition-all duration-700 flex flex-col h-full animate-up cursor-pointer relative ${
         isProcessing ? 'border-cyan-500/30 bg-cyan-500/[0.03]' : 
-        isFailed || videoError ? 'border-red-500/20 bg-red-500/[0.02]' : 
+        isFailed ? 'border-red-500/20 bg-red-500/[0.02]' : 
+        videoError ? 'border-amber-500/20 bg-amber-500/[0.02]' :
         'border-white/5 bg-slate-900/40 hover:border-cyan-500/20 shadow-2xl hover:scale-[1.01]'
       }`}
     >
       <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
-        {isCompleted && !videoError ? (
+        {isCompleted ? (
           <>
             <video 
               ref={videoRef}
-              src={internalSrc || undefined}
-              className={`w-full h-full object-contain transition-opacity duration-1000 ${isLoadingNeural ? 'opacity-30' : 'opacity-100'}`} 
-              playsInline muted={!isPlaying} loop poster={video.thumbnail}
+              src={internalSrc || video.url} // Fallback ke direct URL jika Blob gagal
+              className={`w-full h-full object-contain transition-opacity duration-1000 ${isSyncing ? 'opacity-30' : 'opacity-100'}`} 
+              playsInline muted autoPlay loop poster={video.thumbnail}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
-              onError={() => setVideoError(true)}
-              crossOrigin="anonymous"
+              onError={() => !isSyncing && setVideoError(true)}
             />
-            {isLoadingNeural && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20">
+            {isSyncing && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-20">
                  <div className="w-8 h-8 border-2 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin mb-4"></div>
-                 <p className="text-[8px] font-black text-cyan-400 uppercase tracking-widest animate-pulse">Neural Link Active...</p>
+                 <p className="text-[8px] font-black text-cyan-400 uppercase tracking-widest animate-pulse">Establishing Uplink...</p>
               </div>
             )}
-            {!isPlaying && !isLoadingNeural && (
+            {videoError && !isSyncing && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-20 p-8 text-center">
+                 <p className="text-[10px] text-amber-500 font-black uppercase tracking-widest mb-4">Video Player Error</p>
+                 <button 
+                  onClick={(e) => { e.stopPropagation(); window.open(video.url, '_blank'); }}
+                  className="px-4 py-2 bg-white/5 rounded-lg text-[8px] text-white uppercase border border-white/10"
+                 >
+                   Open in New Tab
+                 </button>
+              </div>
+            )}
+            {!isPlaying && !isSyncing && !videoError && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-all">
                  <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-all">
                     <svg className="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
@@ -136,27 +142,21 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
                 ></div>
                 <div className="text-3xl font-black text-white font-orbitron drop-shadow-[0_0_10px_cyan]">{progress}%</div>
              </div>
-             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Rendering...</p>
+             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Sora Rendering...</p>
           </div>
         ) : (
           <div className="text-center p-8 space-y-4">
              <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
                <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth={2}/></svg>
              </div>
-             <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Failed / Re-Sync Required</p>
-             <button 
-                onClick={(e) => { e.stopPropagation(); setInternalSrc(null); establishNeuralLink(); }} 
-                className="px-4 py-2 bg-white/5 rounded-lg text-[8px] text-slate-400 hover:text-white uppercase tracking-widest border border-white/5 transition-all"
-              >
-                Retry Re-Sync
-              </button>
+             <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Cinema Failed</p>
           </div>
         )}
       </div>
 
       <div className="p-8 flex-grow flex flex-col">
         <div className="flex justify-between items-center mb-6">
-          <span className="text-[8px] font-black px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">SORA-2</span>
+          <span className="text-[8px] font-black px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">SORA-2.0</span>
           <span className="text-[9px] font-mono text-slate-700 font-bold uppercase">ID_{video.uuid.substring(0, 8)}</span>
         </div>
         <p className="text-[12px] text-slate-300 line-clamp-2 italic mb-8 leading-relaxed font-medium">"{video.prompt}"</p>
@@ -171,7 +171,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
             ) : (
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth={2.5}/></svg>
             )}
-            <span>{isDownloading ? 'DOWNLOADING...' : 'DOWNLOAD CINEMA'}</span>
+            <span>{isDownloading ? 'PROCESSING...' : 'DOWNLOAD CINEMA'}</span>
           </button>
         </div>
       </div>
