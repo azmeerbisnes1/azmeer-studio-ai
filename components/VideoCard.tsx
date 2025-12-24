@@ -17,6 +17,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
   const isFailed = status === 3;
   const progress = video.status_percentage || 0;
 
+  // Automatik 'Neural Link' (Blob Fetching) apabila status tamat
   useEffect(() => {
     let active = true;
     if (isCompleted && !internalSrc && !isLoadingNeural && video.url) {
@@ -35,6 +36,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
     setIsLoadingNeural(true);
     setVideoError(false);
     try {
+      // Kita fetch blob untuk atasi masalah octet-stream
       const blobUrl = await fetchVideoAsBlob(video.url);
       if (active) {
         setInternalSrc(blobUrl);
@@ -42,7 +44,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       }
     } catch (err) {
       if (active) {
-        console.error("Link establishment failed:", err);
+        console.error("Neural Sync Failed:", err);
         setVideoError(true);
         setIsLoadingNeural(false);
       }
@@ -55,7 +57,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
     
     setIsDownloading(true);
     try {
-      // Sentiasa gunakan Blob untuk muat turun bagi mempastikan browser tidak 'bingung'
+      // Sentiasa muat turun fail sebagai .mp4 yang betul melalui Blob
       const downloadUrl = internalSrc && internalSrc.startsWith('blob:') 
         ? internalSrc 
         : await fetchVideoAsBlob(video.url);
@@ -110,7 +112,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
             {isLoadingNeural && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20">
                  <div className="w-8 h-8 border-2 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin mb-4"></div>
-                 <p className="text-[8px] font-black text-cyan-400 uppercase tracking-widest animate-pulse">Establishing Cinema Link...</p>
+                 <p className="text-[8px] font-black text-cyan-400 uppercase tracking-widest animate-pulse">Neural Link Active...</p>
               </div>
             )}
             {!isPlaying && !isLoadingNeural && (
@@ -134,14 +136,14 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
                 ></div>
                 <div className="text-3xl font-black text-white font-orbitron drop-shadow-[0_0_10px_cyan]">{progress}%</div>
              </div>
-             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Sora Rendering...</p>
+             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Rendering...</p>
           </div>
         ) : (
           <div className="text-center p-8 space-y-4">
              <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
                <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth={2}/></svg>
              </div>
-             <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Cinema Offline</p>
+             <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Failed / Re-Sync Required</p>
              <button 
                 onClick={(e) => { e.stopPropagation(); setInternalSrc(null); establishNeuralLink(); }} 
                 className="px-4 py-2 bg-white/5 rounded-lg text-[8px] text-slate-400 hover:text-white uppercase tracking-widest border border-white/5 transition-all"
@@ -155,7 +157,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       <div className="p-8 flex-grow flex flex-col">
         <div className="flex justify-between items-center mb-6">
           <span className="text-[8px] font-black px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">SORA-2</span>
-          <span className="text-[9px] font-mono text-slate-700 font-bold uppercase">ARC_{video.uuid.substring(0, 8)}</span>
+          <span className="text-[9px] font-mono text-slate-700 font-bold uppercase">ID_{video.uuid.substring(0, 8)}</span>
         </div>
         <p className="text-[12px] text-slate-300 line-clamp-2 italic mb-8 leading-relaxed font-medium">"{video.prompt}"</p>
         <div className="mt-auto pt-6 border-t border-white/5">
