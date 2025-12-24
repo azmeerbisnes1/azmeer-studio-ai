@@ -16,7 +16,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
   const pollingTimerRef = useRef<number | null>(null);
 
   /**
-   * Syncs user history by fetching UUIDs from Supabase and real-time status from Geminigen.
+   * Menyelaraskan sejarah pengguna dengan mengambil status real-time dari Geminigen.ai.
    */
   const fetchHistory = useCallback(async (showLoading = true) => {
     if (!user || !user.username) {
@@ -28,7 +28,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
     setError(null);
     
     try {
-      // 1. Ambil semua UUID yang tersimpan dalam Arkib Supabase untuk user ini
+      // 1. Ambil semua UUID arkib dari Supabase
       const userUuids = await db.getUuids(user.username);
       
       if (!userUuids || userUuids.length === 0) {
@@ -37,18 +37,18 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
         return;
       }
 
-      // 2. Fetch live status terus dari Geminigen.ai untuk setiap UUID
-      // Ini memastikan peratusan (percentage) dan pautan video sentiasa paling baru
+      // 2. Ambil status terkini untuk setiap UUID secara individu.
+      // Ini menyelesaikan masalah sync di mana peratusan tidak muncul.
       const videoDataPromises = userUuids.map(uuid => 
         getSpecificHistory(uuid).catch(err => {
-          console.error(`Link distortion for node ${uuid}:`, err);
+          console.error(`Ralat pautan pada node ${uuid}:`, err);
           return null;
         })
       );
       
       const rawResults = await Promise.all(videoDataPromises);
       
-      // 3. Map keputusan kepada model data internal dan susun ikut masa terbaru
+      // 3. Map keputusan kepada model UI dan susun mengikut masa terbaru
       const videoItems = rawResults
         .filter(item => item !== null && (item.uuid || item.id))
         .map(item => mapToGeneratedVideo(item))
@@ -56,7 +56,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
           
       setHistory(videoItems);
 
-      // 4. Polling Intelligence: Jika ada video yang masih dalam status Processing (1)
+      // 4. Intelligence Polling: Jika ada video yang masih 'Processing' (Status 1)
       const hasActiveTasks = videoItems.some(v => Number(v.status) === 1);
       
       if (pollingTimerRef.current) {
@@ -65,12 +65,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       }
 
       if (hasActiveTasks) {
-        // Poll setiap 5 saat untuk kemaskini peratusan secara real-time
+        // Poll setiap 5 saat untuk mengemaskini peratusan secara real-time
         pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 5000);
       }
     } catch (err: any) {
       console.error("Neural Vault Sync Error:", err);
-      setError("Gagal menyelaraskan arkib dengan Geminigen.ai.");
+      setError("Gagal menyegerakkan arkib dengan sistem pusat Geminigen.");
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -98,7 +98,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
           </div>
           <div className="flex items-center gap-6">
              <div className="hidden sm:flex flex-col items-end">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Live Processes</p>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Links</p>
                 <p className="text-xl font-black text-cyan-400 font-orbitron">
                   {history.filter(v => Number(v.status) === 1).length}
                 </p>
@@ -111,7 +111,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
               <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              {loading ? 'SYNCING VAULT...' : 'REFRESH ARKIB'}
+              {loading ? 'MENYELARASKAN...' : 'SEGERAKAN ARKIB'}
             </button>
           </div>
         </header>
@@ -127,7 +127,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
             <div className="w-20 h-20 bg-slate-900/50 rounded-full flex items-center justify-center mx-auto mb-6">
                <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" strokeWidth={1}/></svg>
             </div>
-            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">Arkib kosong. Sila jana video pertama anda.</p>
+            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">Tiada rekod dalam arkib sora anda.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 pb-40">

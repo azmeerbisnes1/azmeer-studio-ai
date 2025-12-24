@@ -19,6 +19,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
   const isFailed = status === 3;
   const progress = video.status_percentage || 0;
 
+  // Bersihkan Blob URL apabila komponen dibuang
   useEffect(() => {
     return () => {
       if (internalSrc && internalSrc.startsWith('blob:')) {
@@ -28,8 +29,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
   }, [internalSrc]);
 
   /**
-   * Mengukuhkan pautan video menggunakan Blob Engine.
-   * Digunakan untuk preview dan muat turun.
+   * Menubuhkan 'Neural Link' (Pautan Blob) untuk memastikan fail boleh dimainkan/dimuat turun.
    */
   const establishNeuralLink = async () => {
     if (!isCompleted || !video.url || isLoadingNeural || internalSrc) return null;
@@ -43,7 +43,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       setIsLoadingNeural(false);
       return blobUrl;
     } catch (err) {
-      console.error("Neural Sync Error:", err);
+      console.error("Neural Linkdistorted:", err);
       setVideoError(true);
       setIsLoadingNeural(false);
       return null;
@@ -89,6 +89,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
     setIsDownloading(true);
     
     try {
+      // Pastikan kita gunakan pautan Blob untuk download bagi mengelakkan isu browser 'octet-stream'
       let downloadUrl = internalSrc && internalSrc.startsWith('blob:') ? internalSrc : null;
       if (!downloadUrl) {
         downloadUrl = await fetchVideoAsBlob(video.url);
@@ -96,15 +97,17 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
 
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `Azmeer_Sora_Cinema_${video.uuid.substring(0, 8)}.mp4`;
+      link.download = `Azmeer_Sora_${video.uuid.substring(0, 8)}.mp4`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
+      // Jika ia blob baru (bukan internalSrc), bersihkan
       if (downloadUrl !== internalSrc) {
         setTimeout(() => URL.revokeObjectURL(downloadUrl!), 1000);
       }
     } catch (err) {
+      // Fallback jika blob gagal
       window.open(video.url, '_blank');
     } finally {
       setIsDownloading(false);
@@ -130,6 +133,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
         'border-white/5 bg-slate-900/40 hover:border-cyan-500/20 shadow-2xl hover:scale-[1.01]'
       }`}
     >
+      {/* Media Content Area */}
       <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
         {isCompleted && !videoError ? (
           <>
@@ -157,7 +161,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
                     <div className="absolute inset-0 border-2 border-cyan-500/20 rounded-full"></div>
                     <div className="absolute inset-0 border-2 border-t-cyan-500 rounded-full animate-spin"></div>
                  </div>
-                 <p className="text-[8px] font-black text-cyan-400 uppercase tracking-[0.4em] animate-pulse">Establishing Secure Link...</p>
+                 <p className="text-[8px] font-black text-cyan-400 uppercase tracking-[0.4em] animate-pulse">Menghubungkan Neural Link...</p>
               </div>
             )}
             
@@ -174,16 +178,16 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
              <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
                <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
              </div>
-             <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Cinema Data Corrupted</p>
+             <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Pautan Terputus</p>
              <button 
                onClick={(e) => { e.stopPropagation(); establishNeuralLink(); }}
                className="text-[8px] text-slate-500 hover:text-white uppercase tracking-widest underline decoration-dashed transition-all"
              >
-               Refresh Link Connection
+               Sambung Semula
              </button>
           </div>
         ) : (
-          /* Paparan Peratusan Semasa Rendering */
+          /* Paparan Peratusan (%) Semasa Processing */
           <div className="text-center space-y-8 w-full px-12 py-20 bg-slate-950/40">
              <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
                 <div className="absolute inset-0 border-4 border-slate-900 rounded-full"></div>
@@ -199,8 +203,8 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
                 </div>
              </div>
              <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Rendering Reality...</p>
-                <p className="text-[8px] font-bold uppercase text-slate-600 tracking-[0.2em]">Sora 2.0 Cinema Engine</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Menghasilkan Realiti...</p>
+                <p className="text-[8px] font-bold uppercase text-slate-600 tracking-[0.2em]">Sora 2.0 Elite Engine</p>
              </div>
           </div>
         )}
@@ -230,7 +234,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
             ) : (
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth={2.5}/></svg>
             )}
-            <span>{isDownloading ? 'Downloading...' : 'Download Cinema'}</span>
+            <span>{isDownloading ? 'MEMPROSES...' : 'MUAT TURUN MP4'}</span>
           </button>
           
           <div className="flex gap-2">
@@ -239,7 +243,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
               disabled={!video.url} 
               className="flex-1 text-[9px] font-black uppercase text-slate-600 hover:text-white transition-all tracking-[0.2em] py-2.5 border border-white/5 rounded-xl hover:bg-white/5"
             >
-              {isCopying ? 'Copied' : 'Copy Link'}
+              {isCopying ? 'Berjaya Disalin' : 'Salin Pautan'}
             </button>
           </div>
         </div>
