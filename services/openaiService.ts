@@ -19,8 +19,8 @@ const getApiKey = (passedKey?: string): string => {
 
   if (!rawKey) {
     try {
-      // @ts-ignore
-      rawKey = (import.meta.env?.VITE_OPENAI_API_KEY || process.env?.VITE_OPENAI_API_KEY || "").trim();
+      // Fix: Access env through type assertion to avoid Property 'env' does not exist on type 'ImportMeta'
+      rawKey = ((import.meta as any).env?.VITE_OPENAI_API_KEY || (process.env as any)?.VITE_OPENAI_API_KEY || "").trim();
     } catch (e) {}
   }
   

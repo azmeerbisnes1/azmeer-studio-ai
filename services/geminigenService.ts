@@ -13,7 +13,8 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
   if (!text.trim()) return text;
   
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+    // Fix: Always use process.env.API_KEY directly in named parameter as per guidelines
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `You are an elite cinematic director for Sora AI. 

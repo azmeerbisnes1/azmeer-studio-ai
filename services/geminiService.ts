@@ -13,7 +13,8 @@ export {
 /**
  * Unified Gemini API Client Factory
  */
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+// Fix: Always use process.env.API_KEY directly in named parameter
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
  * Cinema Prompt Refinement (Gemini 3 Flash)
@@ -66,6 +67,7 @@ export const generateUGCPrompt = async (params: {
  * Added to resolve missing export error in ChatView.tsx
  */
 export const generateChatResponse = async (message: string): Promise<string> => {
+  // Fix: Initializing GoogleGenAI with process.env.API_KEY directly
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
@@ -79,6 +81,7 @@ export const generateChatResponse = async (message: string): Promise<string> => 
  * Added to resolve missing export error in ChatView.tsx
  */
 export const generateGeminiTTS = async (text: string): Promise<string> => {
+  // Fix: Initializing GoogleGenAI with process.env.API_KEY directly
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
@@ -100,6 +103,7 @@ export const generateGeminiTTS = async (text: string): Promise<string> => {
  * Added to resolve missing export error in ImageLabView.tsx
  */
 export const generateGeminiImage = async (prompt: string, aspectRatio: "1:1" | "16:9" | "9:16"): Promise<string> => {
+  // Fix: Initializing GoogleGenAI with process.env.API_KEY directly
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
