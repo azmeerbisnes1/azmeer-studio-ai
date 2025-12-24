@@ -3,16 +3,13 @@ import { GeneratedVideo } from "../types.ts";
 import { GoogleGenAI } from "@google/genai";
 
 /**
- * Geminigen API Key System
+ * Geminigen API Key System (Hardcoded as per request)
  */
-const _PART1 = "tts-fe9842ffd74cffdf09";
-const _PART2 = "5bb639e1b21a01";
-const GEMINIGEN_API_KEY = _PART1 + _PART2;
-
+const GEMINIGEN_API_KEY = "tts-fe9842ffd74cffdf095bb639e1b21a01";
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
 /**
- * API Fetcher dengan perlindungan ralat tinggi
+ * Core fetcher dengan sokongan CORS Proxy dan Error Handling
  */
 export async function uapiFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
   const targetPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -20,21 +17,22 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
   
   const headers: Record<string, string> = {
     "x-api-key": GEMINIGEN_API_KEY,
-    "Accept": "application/json",
     ...((options.headers as any) || {})
   };
 
-  // Menggunakan proxy yang lebih stabil
+  // Jangan set Content-Type jika menggunakan FormData (browser akan set secara automatik dengan boundary)
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+    headers["Accept"] = "application/json";
+  }
+
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
 
   try {
     const response = await fetch(proxyUrl, { ...options, headers });
-    
-    if (response.status === 404) throw new Error("Data tidak dijumpai di server.");
-    
     const rawText = await response.text();
-    let data: any = null;
     
+    let data: any = null;
     if (rawText && rawText.trim().length > 0) {
       try {
         data = JSON.parse(rawText);
@@ -50,22 +48,22 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
 
     return data;
   } catch (err: any) {
-    console.error("Fetch Failure:", err.message);
+    console.error("Geminigen API Connection Error:", err.message);
     throw err;
   }
 }
 
 /**
- * Sync status video secara mendalam
+ * Ambil maklumat spesifik history mengikut UUID (Conversion UUID)
  */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   if (!uuid) return null;
-  const res = await uapiFetch(`/history/${uuid}`);
-  return res.data || res.result || res;
+  // Endpoint mengikut dokumentasi: /uapi/v1/history/{conversion_uuid}
+  return await uapiFetch(`/history/${uuid}`);
 };
 
 /**
- * Prompt Refinement - Ditambah guard untuk API_KEY
+ * Prompt Refinement (LOCKED: Tidak diubah)
  */
 export const refinePromptWithAI = async (text: string): Promise<string> => {
   const key = process.env.API_KEY;
@@ -84,7 +82,7 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
 };
 
 /**
- * Permulaan Penjanaan Video
+ * Penjanaan Video Sora 2.0 (Sora-2 sahaja mengikut permintaan)
  */
 export const startVideoGen = async (params: { 
   prompt: string; 
@@ -94,9 +92,9 @@ export const startVideoGen = async (params: {
 }): Promise<any> => {
   const formData = new FormData();
   formData.append('prompt', params.prompt);
-  formData.append('model', 'sora-2');
-  formData.append('resolution', 'small');
-  formData.append('duration', String(params.duration || 10));
+  formData.append('model', 'sora-2'); // Hardcoded sora-2
+  formData.append('resolution', 'small'); // sora-2 hanya sokong small
+  formData.append('duration', String(params.duration || 10)); // 10 atau 15
   formData.append('aspect_ratio', params.ratio === '16:9' ? 'landscape' : 'portrait');
   
   if (params.imageFile) {
@@ -110,7 +108,7 @@ export const startVideoGen = async (params: {
 };
 
 /**
- * Pembersihan URL
+ * Membersihkan URL dan menambah domain jika perlu
  */
 const normalizeUrl = (url: any): string => {
   if (!url || typeof url !== 'string') return "";
@@ -121,37 +119,34 @@ const normalizeUrl = (url: any): string => {
 };
 
 /**
- * Mapper Pintar - Mengendalikan pelbagai format respon Geminigen
+ * Pemetaan Data Berdasarkan Respons Rasmi Get Specific History
  */
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
   
-  // Status Logic
   const status = item.status !== undefined ? Number(item.status) : 1;
-  const percentage = item.status_percentage !== undefined 
-    ? Number(item.status_percentage) 
-    : (item.progress !== undefined ? Number(item.progress) : (status === 2 ? 100 : 0));
+  const percentage = item.status_percentage !== undefined ? Number(item.status_percentage) : (status === 2 ? 100 : 0);
 
-  // Data Extraction
+  // Cari data video dalam array generated_video
   const vList = item.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
-  // Video URL can be in multiple places depending on the API version
-  const rawUrl = vData.video_url || vData.video_uri || item.generate_result || item.url || "";
-  const rawThumb = vData.last_frame || vData.thumbnail || item.thumbnail_url || "";
+  // Ambil URL daripada punca yang paling dipercayai (video_url atau video_uri)
+  const rawUrl = vData.video_url || item.generate_result || "";
+  const rawThumb = vData.last_frame || item.thumbnail_url || "";
 
   return {
     mediaType: 'video',
-    uuid: item.uuid || item.id || "unknown",
+    uuid: item.uuid || "unknown",
     url: normalizeUrl(rawUrl),
     thumbnail: normalizeUrl(rawThumb),
-    prompt: item.input_text || item.prompt || "Cinematic Vision",
+    prompt: item.input_text || "Cinematic Sora 2.0",
     timestamp: new Date(item.created_at || Date.now()).getTime(),
     status: status as (1 | 2 | 3), 
     status_percentage: percentage,
-    aspectRatio: item.aspect_ratio || vData.aspect_ratio || "16:9",
+    aspectRatio: vData.aspect_ratio || item.aspect_ratio || "landscape",
     model_name: item.model_name || "sora-2",
-    duration: vData.duration || item.duration || 10
+    duration: vData.duration || 10
   };
 };
 
@@ -161,18 +156,19 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
   if (!url || !url.startsWith('http')) return url;
   
+  // Gunakan proxy untuk bypass CORS dan membolehkan pembacaan blob
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
   
   try {
     const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error("Proxy fetch failed");
+    if (!response.ok) throw new Error("Fetch failed");
     
-    const blob = await response.blob();
-    // Force format MP4 supaya boleh dimainkan
-    const videoBlob = new Blob([blob], { type: 'video/mp4' });
+    const rawBlob = await response.blob();
+    // PAKSA jenis fail kepada video/mp4
+    const videoBlob = new Blob([rawBlob], { type: 'video/mp4' });
     return URL.createObjectURL(videoBlob);
   } catch (e) {
-    console.warn("Blob conversion failed, using direct URL", e);
+    console.warn("Direct link fallback", e);
     return url;
   }
 };

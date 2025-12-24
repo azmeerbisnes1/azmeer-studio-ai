@@ -50,17 +50,18 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isCompleted || !video.url || isDownloading) return;
+    if (!isCompleted || isDownloading) return;
     
     setIsDownloading(true);
     try {
+      // Sentiasa gunakan Blob untuk muat turun bagi memastikan browser mengenali fail sebagai video
       const downloadUrl = internalSrc && internalSrc.startsWith('blob:') 
         ? internalSrc 
         : await fetchVideoAsBlob(video.url);
       
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `Sora_Azmeer_${video.uuid.substring(0, 8)}.mp4`;
+      link.download = `Azmeer_Sora_${video.uuid.substring(0, 8)}.mp4`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -103,11 +104,12 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onError={() => setVideoError(true)}
+              crossOrigin="anonymous"
             />
             {isLoadingNeural && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20">
                  <div className="w-8 h-8 border-2 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin mb-4"></div>
-                 <p className="text-[8px] font-black text-cyan-400 uppercase tracking-widest animate-pulse">Establishing Link...</p>
+                 <p className="text-[8px] font-black text-cyan-400 uppercase tracking-widest animate-pulse">Syncing Video...</p>
               </div>
             )}
             {!isPlaying && !isLoadingNeural && (
@@ -131,19 +133,19 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
                 ></div>
                 <div className="text-3xl font-black text-white font-orbitron drop-shadow-[0_0_10px_cyan]">{progress}%</div>
              </div>
-             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Neural Rendering...</p>
+             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Sora Rendering...</p>
           </div>
         ) : (
           <div className="text-center p-8 space-y-4">
              <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
                <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeWidth={2}/></svg>
              </div>
-             <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Cinema Node Offline</p>
+             <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Failed / Node Offline</p>
              <button 
                 onClick={(e) => { e.stopPropagation(); setInternalSrc(null); establishNeuralLink(); }} 
                 className="px-4 py-2 bg-white/5 rounded-lg text-[8px] text-slate-400 hover:text-white uppercase tracking-widest border border-white/5 transition-all"
               >
-                Force Re-Sync
+                Retry Connection
               </button>
           </div>
         )}
@@ -151,7 +153,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
 
       <div className="p-8 flex-grow flex flex-col">
         <div className="flex justify-between items-center mb-6">
-          <span className="text-[8px] font-black px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">SORA 2.0</span>
+          <span className="text-[8px] font-black px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">SORA-2</span>
           <span className="text-[9px] font-mono text-slate-700 font-bold uppercase">ARC_{video.uuid.substring(0, 8)}</span>
         </div>
         <p className="text-[12px] text-slate-300 line-clamp-2 italic mb-8 leading-relaxed font-medium">"{video.prompt}"</p>
@@ -159,14 +161,14 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
           <button 
             onClick={handleDownload} 
             disabled={!isCompleted || isDownloading}
-            className={`w-full py-4 rounded-[1.2rem] text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all flex items-center justify-center gap-2 shadow-2xl ${isCompleted ? 'bg-cyan-600 hover:bg-cyan-500 active:scale-95' : 'bg-white/5 text-slate-700 cursor-not-allowed'}`}
+            className={`w-full py-4 rounded-[1.2rem] text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all flex items-center justify-center gap-2 shadow-2xl ${isCompleted ? 'bg-cyan-600 hover:bg-cyan-500 active:scale-95 shadow-cyan-900/40' : 'bg-white/5 text-slate-700 cursor-not-allowed'}`}
           >
             {isDownloading ? (
               <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
             ) : (
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth={2.5}/></svg>
             )}
-            <span>{isDownloading ? 'EXTRACTING...' : 'DOWNLOAD CINEMA'}</span>
+            <span>{isDownloading ? 'PROCESSING...' : 'DOWNLOAD CINEMA'}</span>
           </button>
         </div>
       </div>
