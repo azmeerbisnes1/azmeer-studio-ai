@@ -98,17 +98,18 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
 
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `Azmeer_Studio_${video.uuid.substring(0, 8)}.mp4`;
+      link.download = `Azmeer_Sora_${video.uuid.substring(0, 8)}.mp4`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
+      // Cleanup if we just created this blob temporarily
       if (downloadUrl !== internalSrc) {
         setTimeout(() => URL.revokeObjectURL(downloadUrl!), 1000);
       }
     } catch (err) {
       console.error("Download failed:", err);
-      // Fallback to direct link if blob fails
+      // Fallback to opening direct link if proxy fails
       window.open(video.url, '_blank');
     } finally {
       setIsDownloading(false);

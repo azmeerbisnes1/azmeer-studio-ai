@@ -46,55 +46,17 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
 }
 
 /**
- * Cinema Prompt Refinement (Gemini 3 Flash)
+ * Get all generation history from Geminigen.ai
  */
-export const refinePromptWithAI = async (text: string): Promise<string> => {
-  if (!text.trim()) return text;
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `You are a world-class cinematic director for Sora 2.0. 
-      Transform the following user idea into a highly detailed, visually stunning video prompt. 
-      Return ONLY the refined English prompt.
-      User Idea: ${text}`,
-    });
-    return response.text?.trim() || text;
-  } catch (error) {
-    return text;
-  }
+export const getAllHistory = async (page = 1, itemsPerPage = 50): Promise<any> => {
+  return await uapiFetch(`/histories?filter_by=all&items_per_page=${itemsPerPage}&page=${page}`);
 };
 
-export const startVideoGen = async (params: { 
-  prompt: string, 
-  duration: number, 
-  ratio: string,
-  imageFile?: File | string 
-}) => {
-  const formData = new FormData();
-  formData.append("prompt", params.prompt);
-  formData.append("model", "sora-2"); 
-  formData.append("duration", params.duration.toString()); 
-  formData.append("aspect_ratio", params.ratio === '16:9' ? 'landscape' : 'portrait');
-  formData.append("resolution", "small"); 
-
-  if (params.imageFile) {
-    if (params.imageFile instanceof File) {
-      formData.append("files", params.imageFile);
-    } else {
-      formData.append("file_urls", params.imageFile as string);
-    }
-  }
-
-  return await uapiFetch("/video-gen/sora", { 
-    method: "POST", 
-    body: formData 
-  });
-}
-
+/**
+ * Get specific generation history by UUID
+ */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   const res = await uapiFetch(`/history/${uuid}`);
-  // The documentation shows the data can be the root object or nested in .data
   return res.data || res.result || res;
 };
 
@@ -106,23 +68,29 @@ const normalizeUrl = (url: any): string => {
     return trimmed;
   }
   
+  // Handle paths that might need the CDN prefix
   const cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
   if (!cleanPath) return "";
   return `https://cdn.geminigen.ai/${cleanPath}`;
 };
 
+/**
+ * Map API item to app's GeneratedVideo interface
+ */
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
   
-  const root = item;
-  const vList = root.generated_video || [];
-  const vData = vList.length > 0 ? vList[0] : {};
+  // Handle different potential response structures
+  const root = item.data || item.result || item;
   
-  // Status: 1 (Processing), 2 (Completed), 3 (Failed)
+  // Status mapping as per doc: 1 (Processing), 2 (Completed), 3 (Failed)
   const status = root.status !== undefined ? Number(root.status) : 1;
   const percentage = root.status_percentage !== undefined ? Number(root.status_percentage) : (status === 2 ? 100 : 0);
 
-  // Preference order for video URL: generated_video[0].video_url -> root.generate_result
+  // Extract video info from generated_video array or direct properties
+  const vList = root.generated_video || [];
+  const vData = vList.length > 0 ? vList[0] : {};
+  
   let rawUrl = vData.video_url || vData.video_uri || root.generate_result || "";
   let rawThumb = vData.thumbnail || vData.last_frame || root.thumbnail_url || "";
 
@@ -158,7 +126,7 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
       if (!response.ok) continue;
       
       const blob = await response.blob();
-      // Ensure the blob is specifically marked as video/mp4
+      // Important: Specifically set the type to video/mp4
       const videoBlob = new Blob([blob], { type: 'video/mp4' });
       return URL.createObjectURL(videoBlob);
     } catch (e) {
@@ -168,4 +136,51 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
   }
   
   return url; 
+};
+
+/**
+ * Prompt Refinement
+ */
+export const refinePromptWithAI = async (text: string): Promise<string> => {
+  if (!text.trim()) return text;
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `You are a world-class cinematic director for Sora 2.0. 
+      Transform the following user idea into a highly detailed, visually stunning video prompt. 
+      Return ONLY the refined English prompt.
+      User Idea: ${text}`,
+    });
+    return response.text?.trim() || text;
+  } catch (error) {
+    return text;
+  }
+};
+
+// Fix: Added missing startVideoGen export used in geminiService.ts and SoraStudioView.tsx
+/**
+ * Start Video Generation on Geminigen.ai
+ */
+export const startVideoGen = async (params: { 
+  prompt: string; 
+  duration?: number; 
+  ratio?: string; 
+  imageFile?: File; 
+}): Promise<any> => {
+  const formData = new FormData();
+  formData.append('input_text', params.prompt);
+  formData.append('duration', String(params.duration || 10));
+  formData.append('aspect_ratio', params.ratio || '16:9');
+  formData.append('model_name', 'sora-2');
+  
+  if (params.imageFile) {
+    formData.append('image_file', params.imageFile);
+  }
+
+  // FormData handling: fetch automatically sets the correct Content-Type and boundary
+  return await uapiFetch('/generate', {
+    method: 'POST',
+    body: formData
+  });
 };

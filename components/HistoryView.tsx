@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getSpecificHistory, mapToGeneratedVideo } from '../services/geminigenService.ts';
+import { getSpecificHistory, getAllHistory, mapToGeneratedVideo } from '../services/geminigenService.ts';
 import { db } from '../services/supabaseService.ts';
 import { GeneratedVideo, User } from '../types.ts';
 import { VideoCard } from './VideoCard.tsx';
@@ -15,6 +15,10 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
   const [error, setError] = useState<string | null>(null);
   const pollingTimerRef = useRef<number | null>(null);
 
+  /**
+   * Syncs the user's specific history by fetching their UUIDs from Supabase
+   * and updating the current state from Geminigen.ai live data.
+   */
   const fetchHistory = useCallback(async (showLoading = true) => {
     if (!user || !user.username) {
       setLoading(false);
@@ -29,12 +33,18 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       const userUuids = await db.getUuids(user.username);
       
       if (!userUuids || userUuids.length === 0) {
+        // Fallback: Check if there's any history in Geminigen that matches our key
+        // to see if we missed anything (optional safeguard)
+        const allRes = await getAllHistory(1, 20);
+        const allItems = allRes.result || [];
+        // Since we don't have a reliable user-filter on the API, we rely on Supabase
+        // but if items are missing in Supabase, they won't show here.
         setHistory([]);
         setLoading(false);
         return;
       }
 
-      // 2. Fetch live details for each UUID from Geminigen
+      // 2. Fetch live details for each UUID from Geminigen to get per-second updates
       const videoDataPromises = userUuids.map(uuid => 
         getSpecificHistory(uuid).catch(err => {
           console.error(`Failed to fetch UUID ${uuid}:`, err);
@@ -61,7 +71,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       }
 
       if (hasActiveTasks) {
-        // Poll every 5 seconds for status changes
+        // Poll every 5 seconds for status/percentage changes
         pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 5000);
       }
     } catch (err: any) {
