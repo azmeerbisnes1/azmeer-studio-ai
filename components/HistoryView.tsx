@@ -25,7 +25,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
     setError(null);
     
     try {
-      // 1. Ambil UUID dari Supabase
+      // 1. Ambil UUID yang disimpan dalam Supabase anda
       const userUuids = await db.getUuids(user.username);
       
       if (!userUuids || userUuids.length === 0) {
@@ -34,11 +34,11 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
         return;
       }
 
-      // 2. Deep Sync: Tarik status LIVE terus dari Geminigen.ai untuk setiap UUID
-      // Ini memastikan peratusan (%) sentiasa dikemaskini mengikut data server pusat.
+      // 2. Deep Sync: Dapatkan status LIVE dari server Geminigen untuk setiap UUID
+      // Ini menyelesaikan isu desync antara Supabase dan API asal
       const videoDataPromises = userUuids.map(uuid => 
         getSpecificHistory(uuid).catch(err => {
-          console.error(`Sync error on node ${uuid}:`, err);
+          console.warn(`Sync failed for UUID: ${uuid}`, err);
           return null;
         })
       );
@@ -52,7 +52,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
           
       setHistory(videoItems);
 
-      // 3. Intelligence: Jika ada video yang masih 'Processing' (Status 1)
+      // 3. Polling Logic: Jika ada video status 1 (Processing), poll setiap 4 saat
       const hasActiveTasks = videoItems.some(v => Number(v.status) === 1);
       
       if (pollingTimerRef.current) {
@@ -61,12 +61,11 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       }
 
       if (hasActiveTasks) {
-        // Poll setiap 5 saat untuk kemaskini peratusan (%) secara real-time
-        pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 5000);
+        pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 4000);
       }
     } catch (err: any) {
-      console.error("Neural Vault Sync Error:", err);
-      setError("Gagal menyelaraskan arkib dengan server pusat.");
+      console.error("Vault Sync Error:", err);
+      setError("Gagal menyambung ke Arkib Pusat. Sila refresh semula.");
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -85,8 +84,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
         <header className="mb-16 flex flex-col lg:flex-row lg:items-end justify-between gap-8 pt-6 animate-up">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-2.5 h-2.5 rounded-full bg-cyan-500 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
-              <p className="text-cyan-500 text-[10px] font-black uppercase tracking-[0.5em]">Neural Archive Vault</p>
+              <div className="w-2.5 h-2.5 rounded-full bg-cyan-500 shadow-[0_0_12px_cyan]"></div>
+              <p className="text-cyan-500 text-[10px] font-black uppercase tracking-[0.5em]">Neural Cinema Archive</p>
             </div>
             <h2 className="text-5xl md:text-7xl font-black text-white tracking-tighter uppercase leading-none">
               Cinema <span className="text-slate-900 stroke-text">Vault</span>
@@ -100,22 +99,19 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
             <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            {loading ? 'SYNCHRONIZING...' : 'SYNC NEURAL VAULT'}
+            {loading ? 'SYNCHRONIZING...' : 'REFRESH VAULT'}
           </button>
         </header>
 
         {error && (
           <div className="mb-10 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl text-center">
-             <p className="text-red-400 text-[10px] font-black uppercase tracking-widest">Neural Link Distorted: {error}</p>
+             <p className="text-red-400 text-[10px] font-black uppercase tracking-widest">{error}</p>
           </div>
         )}
 
         {history.length === 0 && !loading ? (
           <div className="text-center py-40 border-4 border-dashed border-slate-900/50 rounded-[4rem] bg-slate-900/5 animate-up">
-            <div className="w-20 h-20 bg-slate-900/50 rounded-full flex items-center justify-center mx-auto mb-6">
-               <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" strokeWidth={1}/></svg>
-            </div>
-            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">No records found in the vault.</p>
+            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">Tiada rakaman sora dalam arkib anda.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 pb-40">
