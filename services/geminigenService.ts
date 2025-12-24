@@ -2,13 +2,12 @@
 import { GeneratedVideo } from "../types.ts";
 import { GoogleGenAI } from "@google/genai";
 
-// Kunci API Geminigen (Gunakan yang diberikan oleh servis)
+// Kunci API Geminigen
 const GEMINIGEN_API_KEY = "tts-fe9842ffd74cffdf095bb639e1b21a01";
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
 /**
  * Menggunakan Gemini 3 Flash untuk pemurnian prompt secara sinematik.
- * Memberi arahan kepada model untuk bertindak sebagai Director Filem.
  */
 export const refinePromptWithAI = async (text: string): Promise<string> => {
   if (!text.trim()) return text;
@@ -37,7 +36,7 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
 };
 
 /**
- * Enjin fetch utama dengan pengesahan x-api-key
+ * Enjin fetch utama yang selamat daripada ralat 'Unexpected end of JSON input'
  */
 export async function uapiFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
   const targetUrl = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
@@ -50,13 +49,27 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
 
   try {
     const response = await fetch(targetUrl, { ...options, headers });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `API Error: ${response.status}`);
+    
+    // SAFE PARSING: Ambil sebagai teks dahulu
+    const rawText = await response.text();
+    let data: any = null;
+    
+    if (rawText && rawText.trim().length > 0) {
+      try {
+        data = JSON.parse(rawText);
+      } catch (e) {
+        console.warn("Geminigen API returned non-JSON:", rawText);
+        data = { message: rawText };
+      }
     }
-    return await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.message || `API Error: ${response.status}`);
+    }
+    
+    return data;
   } catch (err: any) {
-    console.error("Fetch error:", err);
+    console.error("Geminigen Fetch error:", err);
     throw err;
   }
 }
@@ -88,7 +101,6 @@ export const startVideoGen = async (params: {
   });
 }
 
-// Added getAllHistory to fix member missing error in geminiService.ts
 export const getAllHistory = async (page = 1, limit = 50): Promise<any> => {
   return await uapiFetch(`/history?page=${page}&limit=${limit}`);
 };
@@ -98,17 +110,19 @@ export const getSpecificHistory = async (uuid: string): Promise<any> => {
 };
 
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
+  if (!item) return {} as GeneratedVideo;
+  
   const vData = (item.generated_video && item.generated_video.length > 0) ? item.generated_video[0] : {};
   let rawUrl = vData.video_url || vData.video_uri || item.generate_result || "";
   
-  if (rawUrl && !rawUrl.startsWith('http')) {
+  if (rawUrl && typeof rawUrl === 'string' && !rawUrl.startsWith('http')) {
      rawUrl = `https://cdn.geminigen.ai/${rawUrl}`;
   }
 
   return {
     mediaType: 'video',
-    uuid: item.uuid || item.id,
-    url: rawUrl,
+    uuid: item.uuid || item.id || "unknown",
+    url: typeof rawUrl === 'string' ? rawUrl : "",
     prompt: item.input_text || "Sora Generation",
     timestamp: new Date(item.created_at || Date.now()).getTime(),
     status: (item.status === 2 || item.status_percentage >= 100) ? 2 : (item.status === 3 ? 3 : 1),

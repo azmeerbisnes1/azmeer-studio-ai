@@ -25,7 +25,8 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `You are an elite cinematic director. Transform this idea into a detailed Sora 2.0 prompt. 
-      Focus on lighting, camera angles (drone, 35mm), and textures. Return ONLY the refined prompt.
+      Focus on lighting (volumetric, anamorphic flares), camera angles (dolly zoom, drone path), and high-end textures. 
+      Return ONLY the refined prompt in English.
       Idea: ${text}`,
     });
     return response.text?.trim() || text;
@@ -42,15 +43,15 @@ export const generateWebVideoPrompt = async (webDesc: string): Promise<string> =
     const ai = getAI();
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Transform this website description into a masterpiece cinematic UI/UX showcase video prompt for Sora 2.0.
+      contents: `You are a world-class UI/UX Motion Designer. Create a masterpiece cinematic video prompt for Sora 2.0 based on this website description.
       Website Description: ${webDesc}
       
-      Requirements:
-      - Describe a futuristic, 3D landing page.
-      - Mention dynamic interactions (parallax, floating elements).
-      - Include "Cinematic 8k resolution, elegant UI design, premium typography".
-      - Describe smooth camera movements like "macro focus on glass buttons" or "smooth scroll transition".
-      - Tone: Luxury and High-Tech.
+      Requirements for the video:
+      - 3D spatial UI elements floating in a luxurious dark environment.
+      - Smooth parallax scrolling with "Macro Lens" focus on high-fidelity buttons and typography.
+      - Soft glowing borders (Neon Cyan/Purple) and glassmorphism textures.
+      - Cinematic camera movement: A slow sweeping drone shot over the digital landscape.
+      - Aesthetic: Premium, Futuristic, Apple-style product reveal.
       
       Return ONLY the final prompt in English.`,
     });
@@ -61,49 +62,25 @@ export const generateWebVideoPrompt = async (webDesc: string): Promise<string> =
 };
 
 /**
- * UGC Wizard Logic (Gemini 3 Pro)
- */
-export const generateUGCPrompt = async (params: { 
-  productDescription: string, 
-  gender: 'lelaki' | 'perempuan', 
-  platform: 'tiktok' | 'facebook' 
-}): Promise<string> => {
-  const ai = getAI();
-  const character = params.gender === 'perempuan' ? "Malay woman wearing hijab" : "Malay man";
-  const platformTarget = params.platform === 'tiktok' ? "TikTok (9:16 vertical, high energy)" : "Facebook (1:1 or 4:5, conversational)";
-  const cta = params.platform === 'tiktok' ? "tekan beg kuning" : "tekan link di bawah";
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: `Generate a high-converting UGC influencer video prompt for Sora 2.0.
-    Product: ${params.productDescription}
-    Character: ${character}
-    Platform: ${platformTarget}
-    Instructions: High energy, natural lighting, include a Malay script in the scene. 
-    Ending CTA: ${cta}.
-    Return ONLY the final prompt text.`,
-  });
-
-  return response.text?.trim() || params.productDescription;
-};
-
-/**
  * Chat Response Generator (Gemini 3 Pro)
  */
 export const generateChatResponse = async (message: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
     contents: message,
+    config: {
+      systemInstruction: "You are the AI brain of Azmeer AI Studio. You are an expert in cinematic video generation and Sora 2.0 prompts. Be professional, creative, and inspiring."
+    }
   });
-  return response.text || "";
+  return response.text || "Maaf, sistem sedang sibuk.";
 };
 
 /**
  * TTS Generator (Gemini 2.5 Flash TTS)
  */
 export const generateGeminiTTS = async (text: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text }] }],
@@ -120,23 +97,31 @@ export const generateGeminiTTS = async (text: string): Promise<string> => {
 };
 
 /**
- * Image Generation (Gemini 2.5 Flash Image)
+ * Image Generator (Gemini 2.5 Flash Image)
  */
-export const generateGeminiImage = async (prompt: string, aspectRatio: "1:1" | "16:9" | "9:16"): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Added to fix missing export error in ImageLabView.tsx
+export const generateGeminiImage = async (prompt: string, aspectRatio: "1:1" | "16:9" | "9:16" = "1:1"): Promise<string> => {
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
-    contents: { parts: [{ text: prompt }] },
+    contents: {
+      parts: [{ text: prompt }],
+    },
     config: {
-      imageConfig: { aspectRatio }
+      imageConfig: {
+        aspectRatio: aspectRatio,
+      },
     },
   });
-  
-  const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-  if (part?.inlineData) {
-    return `data:image/png;base64,${part.inlineData.data}`;
+
+  if (response.candidates?.[0]?.content?.parts) {
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
   }
-  throw new Error("Imej tidak berjaya dijana.");
+  throw new Error("No image data found in response");
 };
 
 /**
