@@ -9,7 +9,7 @@ const GEMINIGEN_API_KEY = "tts-fe9842ffd74cffdf095bb639e1b21a01";
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
 /**
- * Core Request Engine dengan Deep Logging
+ * Core Request Engine - Sekarang dengan pemprosesan respons yang lebih agresif
  */
 export async function uapiFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
   const targetPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -25,6 +25,7 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
     headers["Accept"] = "application/json";
   }
 
+  // Menggunakan CORS Proxy untuk mengelakkan sekatan browser
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
 
   try {
@@ -41,30 +42,29 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
     }
 
     if (!response.ok) {
-      // Sesetengah error berada dalam data.data.message atau data.detail
-      const errorMsg = data?.data?.message || data?.detail?.message || data?.message || `API Error: ${response.status}`;
+      const errorMsg = data?.data?.message || data?.detail || data?.message || `API Error: ${response.status}`;
       throw new Error(errorMsg);
     }
 
-    // Jika API bungkus dalam { status: 200, data: { ... } }
-    return data?.data || data;
+    // Geminigen sering membungkus respons dalam objek 'data'
+    return data;
   } catch (err: any) {
-    console.error(`[Geminigen API Error] ${endpoint}:`, err.message);
+    console.error(`[Neural Diagnostic] API Error at ${endpoint}:`, err.message);
     throw err;
   }
 }
 
 /**
- * Mendapatkan Status Video (Mendukung pelbagai format respons)
+ * Get Video Data (Deep Search)
  */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   if (!uuid) return null;
-  const res = await uapiFetch(`/history/${uuid}`);
-  return res;
+  // Kita ambil respons penuh untuk dianalisis oleh mapper
+  return await uapiFetch(`/history/${uuid}`);
 };
 
 /**
- * Prompt Refinement (LOCKED: Logik asal tidak diubah)
+ * Prompt Refinement (LOCKED: Logik asal dikekalkan)
  */
 export const refinePromptWithAI = async (text: string): Promise<string> => {
   const key = process.env.API_KEY;
@@ -83,7 +83,7 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
 };
 
 /**
- * Memulakan Penjanaan Video (Sora 2.0)
+ * Start Sora Generation
  */
 export const startVideoGen = async (params: { 
   prompt: string; 
@@ -102,38 +102,43 @@ export const startVideoGen = async (params: {
     formData.append('files', params.imageFile);
   }
 
-  const res = await uapiFetch('/video-gen/sora', {
+  return await uapiFetch('/video-gen/sora', {
     method: 'POST',
     body: formData
   });
-  
-  return res;
 };
 
 /**
- * URL Sanitizer - Memastikan URL sentiasa lengkap dengan domain CDN
+ * URL Sanitizer - Menangani format path relatif atau penuh
  */
 const normalizeUrl = (url: any): string => {
   if (!url || typeof url !== 'string') return "";
   let trimmed = url.trim();
   if (trimmed.toLowerCase().startsWith('http')) return trimmed;
-  // Jika server hantar path separuh, kita lengkapkan
   const cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
   return `https://cdn.geminigen.ai/${cleanPath}`;
 };
 
 /**
- * Deep Data Mapper - Menyelam ke dalam respons API untuk mencari data penting
+ * Deep Data Mapper - Mencari data dalam setiap lapisan respons
  */
 export const mapToGeneratedVideo = (raw: any): GeneratedVideo => {
-  // Jika respons dibungkus dalam 'data', kita ambil yang dalam
+  // Geminigen respons selalunya: { status: 200, data: { ... } } atau terus { uuid: ... }
   const item = raw?.data || raw;
-  if (!item) return {} as GeneratedVideo;
+  
+  if (!item) {
+    return {
+      uuid: "unknown",
+      status: 3,
+      prompt: "Data Corrupted",
+      url: "",
+      timestamp: Date.now()
+    } as GeneratedVideo;
+  }
   
   const status = item.status !== undefined ? Number(item.status) : 1;
   const percentage = item.status_percentage !== undefined ? Number(item.status_percentage) : (status === 2 ? 100 : 0);
 
-  // Mencari video dalam array 'generated_video' atau field 'generate_result'
   const vList = item.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
@@ -142,10 +147,10 @@ export const mapToGeneratedVideo = (raw: any): GeneratedVideo => {
 
   return {
     mediaType: 'video',
-    uuid: item.uuid || item.id || vData.uuid || "unknown",
+    uuid: item.uuid || item.id || "unknown",
     url: normalizeUrl(rawUrl),
     thumbnail: normalizeUrl(rawThumb),
-    prompt: item.input_text || item.prompt || "Cinematic Vision",
+    prompt: item.input_text || item.prompt || "Cinematic Sora Render",
     timestamp: new Date(item.created_at || Date.now()).getTime(),
     status: status as (1 | 2 | 3), 
     status_percentage: percentage,
@@ -156,7 +161,7 @@ export const mapToGeneratedVideo = (raw: any): GeneratedVideo => {
 };
 
 /**
- * Fetch Video sebagai Blob (Mengendalikan octet-stream)
+ * Fetch Video Blob dengan x-api-key Passthrough
  */
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
   if (!url || !url.startsWith('http')) return url;
@@ -168,14 +173,13 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
       headers: { "x-api-key": GEMINIGEN_API_KEY }
     });
     
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`CDN Access Denied: ${response.status}`);
     
     const buffer = await response.arrayBuffer();
-    // Force MP4 format
     const blob = new Blob([buffer], { type: 'video/mp4' });
     return URL.createObjectURL(blob);
   } catch (e) {
-    console.warn("Blob conversion failed, fallback to direct URL", e);
+    console.warn("[Stream Fallback] Using direct URL instead of Blob");
     return url;
   }
 };
