@@ -52,38 +52,38 @@ export const generateUGCPrompt = async (params: {
   
   // Character Definitions
   const charFemale = "A beautiful 30-year-old Malay woman, wearing a stylish modest hijab and professional modern attire. She has a charismatic Malaysian influencer vibe, warm and friendly.";
-  const charMale = "A handsome 30-year-old Malay man, clean-shaved with neat short hair, wearing a professional smart-casual outfit. STRICTLY NO earrings, NO necklaces, NO bracelets, and NO rings. He looks like a polite, professional Malaysian influencer.";
+  const charMale = "A handsome 30-year-old Malay man in his 30s, wearing a smart casual outfit like a polo shirt or clean t-shirt. He is clean-shaven with neat short hair. STRICTLY NO earrings, NO necklaces, NO bracelets, and NO rings. He looks like a polite, professional Malaysian influencer.";
   
   const selectedChar = params.gender === 'female' ? charFemale : charMale;
 
   const systemPrompt = `You are a world-class UGC (User Generated Content) Creative Director for Sora 2.0.
-Your task is to write a single, highly detailed cinematic video prompt in English.
+Your task is to write a single, highly detailed cinematic video prompt in English for an AI video generator.
 
 VIDEO ARCHITECTURE (Exactly 15 Seconds):
-The video MUST have 5 distinct segments of 3 seconds each. Every 3 seconds, the camera angle and visual style MUST change drastically.
+The video MUST have 5 distinct segments of 3 seconds each. Every 3 seconds, you MUST describe a drastic camera angle change and visual shift.
 
-STRICT TIMELINE INSTRUCTION:
-1. 0s-3s [THE HOOK]: Extreme close-up or high-energy medium shot. ${selectedChar} looks directly at the camera with high energy, holding the product. They say a short hook in casual "Bahasa Melayu Malaysia".
-2. 3s-6s [THE PROBLEM/NEED]: 45-degree side shot or over-the-shoulder. Character interacting with the product in a premium lifestyle setting. Lighting is warm and volumetric.
-3. 6s-9s [PRODUCT DETAIL]: Macro lens extreme close-up. Focus on the product's high-quality texture, label, or unique feature. Shallow depth of field, anamorphic lens flares.
-4. 9s-12s [THE RESULT]: Low-angle hero shot or wide dynamic shot. Character looking extremely satisfied/happy with the product results.
-5. 12s-15s [THE CTA]: Final camera shift to a direct eye-level shot. Character pointing towards the screen. Add a clean, bold Text Overlay in the center reading: "${ctaText}".
+STRICT TIMELINE AND CONTENT INSTRUCTION:
+- Visual Style: Photorealistic, cinematic 4K, high-end studio lighting, volumetric shadows, 8k resolution.
+- Characters: Use the provided character description (${params.gender === 'female' ? 'Female Malay Hijab' : 'Male Malay polite influencer'}).
+- Dialogue: The character MUST be speaking in natural, casual "Bahasa Melayu Malaysia" (Malaysian daily conversation style).
+- Text: NO subtitles. NO text overlays in the first 12 seconds. ONLY the final CTA text at the end.
 
-CORE RULES:
-- DIALOGUE: Any spoken words MUST be in natural, casual, and short "Bahasa Melayu Malaysia" (Bahasa harian/santai).
-- VISUALS: Describe everything in cinematic English (4K, photorealistic, cinematic lighting, 8k resolution).
-- TEXT: NO subtitles. NO on-screen text during the first 12 seconds. ONLY the final CTA text at the 12s-15s mark.
-- CHARACTER: Strictly follow the demographic rules (Malay, 30s, polite, no jewelry for men).
+TIMELINE BREAKDOWN:
+1. 0s-3s [THE HOOK]: Extreme close-up or high-energy medium shot. ${selectedChar} looks directly at the lens, smiling enthusiastically while holding the product. They say a catchy hook in casual Malay.
+2. 3s-6s [PRODUCT INTRO]: 45-degree side shot or over-the-shoulder shot. Character demonstrating the product in a premium home or minimalist office setting. Character continues speaking casual Malay about why they love it.
+3. 6s-9s [MACRO DETAIL]: Macro lens extreme close-up focusing on the product's texture, premium label, or specific high-quality feature. Cinematic lighting with anamorphic lens flares. Character's voiceover in Malay explains the benefit.
+4. 9s-12s [DEMONSTRATION/REACTION]: Eye-level medium shot. Character using the product and showing a look of extreme satisfaction or "wow" factor. Energetic body language. Dialogue in Malay confirms the result.
+5. 12s-15s [THE CTA]: Final camera shift to a direct eye-level centered shot. Character pointing towards the viewer/screen with a friendly smile. A clean, bold Text Overlay appears in the center reading: "${ctaText}".
 
-Return ONLY the final cinematic prompt string.`;
+Return ONLY the final detailed cinematic prompt string in English (with the Malay dialogue embedded where appropriate).`;
 
   const payload = {
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `Product/Topic: ${params.productDesc}` }
+      { role: "user", content: `Product Description/Idea: ${params.productDesc}` }
     ],
-    temperature: 0.85
+    temperature: 0.8
   };
 
   const result = await fetchOpenAI(payload);
