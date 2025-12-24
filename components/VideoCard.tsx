@@ -17,7 +17,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video: initialV
   const isProcessing = video.status === 1 && !isCompleted;
   const isFailed = video.status === 3;
 
-  // Hydrate video details if URL is missing and it's completed
   useEffect(() => {
     if (isCompleted && !video.url && !isHydrating) {
       const hydrate = async () => {
@@ -66,7 +65,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video: initialV
       const bUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = bUrl;
-      link.download = `Azmeer_Sora_${video.uuid.substring(0, 8)}.mp4`;
+      link.download = `AzmeerAI_Video_${video.uuid.substring(0, 8)}.mp4`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -107,14 +106,14 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video: initialV
             ) : isHydrating ? (
               <div className="text-center p-8 space-y-4">
                  <div className="w-8 h-8 border-2 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin mx-auto"></div>
-                 <p className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Hydrating Link...</p>
+                 <p className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Tengah Load Link...</p>
               </div>
             ) : (
               <div className="text-center p-8 flex flex-col items-center justify-center space-y-4">
                  <svg className="w-12 h-12 text-red-500/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                 <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Neural Link Unavailable</p>
+                 <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Video Tiada Dalam Server</p>
                  {video.url && (
-                    <button onClick={() => window.open(video.url, '_blank')} className="text-[8px] font-black uppercase bg-slate-800 text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors">Direct Open</button>
+                    <button onClick={() => window.open(video.url, '_blank')} className="text-[8px] font-black uppercase bg-slate-800 text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors">Buka Terus</button>
                  )}
               </div>
             )}
@@ -122,7 +121,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video: initialV
         ) : isFailed ? (
           <div className="text-center p-8 space-y-4">
              <svg className="w-10 h-10 text-red-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-             <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Generation Failed</p>
+             <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Gagal Dijana</p>
           </div>
         ) : (
           <div className="text-center space-y-6 w-full px-10 relative py-20 bg-slate-950/40">
@@ -135,8 +134,8 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video: initialV
                 </div>
              </div>
              <div className="space-y-1">
-               <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Rendering Neural Sora</p>
-               <p className="text-[8px] text-slate-600 font-mono uppercase">Cluster: {video.uuid.substring(0, 6)}</p>
+               <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Sedang Diproses...</p>
+               <p className="text-[8px] text-slate-600 font-mono uppercase">ID: {video.uuid.substring(0, 6)}</p>
              </div>
           </div>
         )}
@@ -145,7 +144,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video: initialV
       <div className="p-8 flex-grow flex flex-col">
         <div className="flex justify-between items-center mb-6">
           <div className="flex gap-2">
-            <span className="text-[8px] font-black px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">{video.model_name.toUpperCase()}</span>
+            <span className="text-[8px] font-black px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">SORA 2.0</span>
             <span className="text-[8px] font-black px-3 py-1.5 rounded-lg bg-white/5 text-slate-500 border border-white/10">{video.duration}S</span>
           </div>
           <span className="text-[9px] font-mono text-slate-700 uppercase">{video.aspectRatio}</span>
@@ -164,10 +163,10 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video: initialV
             ) : (
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth={3}/></svg>
             )}
-            <span>{isCompleted ? (isDownloading ? 'Processing...' : 'Muat Turun MP4') : isFailed ? 'FAILED' : 'In Queue...'}</span>
+            <span>{isCompleted ? (isDownloading ? 'Diproses...' : 'Download Video') : isFailed ? 'GAGAL' : 'Menunggu...'}</span>
           </button>
           <div className="flex justify-between items-center px-2 mt-4">
-            <button onClick={copyLink} disabled={!video.url} className={`text-[9px] font-black uppercase tracking-widest ${video.url ? 'text-slate-600 hover:text-cyan-400 transition-colors' : 'text-slate-800 cursor-not-allowed'}`}>{isCopying ? 'Link Copied!' : 'Salin Pautan'}</button>
+            <button onClick={copyLink} disabled={!video.url} className={`text-[9px] font-black uppercase tracking-widest ${video.url ? 'text-slate-600 hover:text-cyan-400 transition-colors' : 'text-slate-800 cursor-not-allowed'}`}>{isCopying ? 'Link Disalin!' : 'Copy Link'}</button>
             <span className="text-[8px] font-mono text-slate-800 tracking-tighter">{video.uuid.substring(0, 12)}</span>
           </div>
         </div>

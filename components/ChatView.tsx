@@ -8,7 +8,7 @@ const ChatView: React.FC = () => {
     {
       id: '1',
       role: 'model',
-      content: "Selamat datang ke Omnis Terminal. Saya adalah Gemini 3 Pro. Bagaimana saya boleh bantu sinematik anda hari ini?",
+      content: "Hai! Saya pembantu AI anda. Ada apa-apa yang saya boleh bantu untuk buat video atau brainstorm idea hari ini?",
       timestamp: Date.now()
     }
   ]);
@@ -44,7 +44,7 @@ const ChatView: React.FC = () => {
       const modelMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        content: result || 'Ralat neural dikesan.',
+        content: result || 'Maaf, sistem sedang sibuk. Sila cuba lagi.',
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, modelMessage]);
@@ -87,7 +87,7 @@ const ChatView: React.FC = () => {
       <header className="px-8 py-6 border-b border-slate-800/50 bg-slate-900/20 backdrop-blur-xl sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>
-          <h2 className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.4em]">Gemini Omnis 3.0 Pro</h2>
+          <h2 className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.4em]">Pembantu AI Azmeer</h2>
         </div>
       </header>
 
@@ -139,7 +139,7 @@ const ChatView: React.FC = () => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Tanyakan Omnis..."
+            placeholder="Tanya apa-apa kat sini..."
             className="w-full bg-slate-900/60 border border-white/10 focus:border-cyan-500/50 rounded-[2rem] py-6 pl-10 pr-20 text-sm text-slate-200 outline-none transition-all group-hover:border-white/20 focus:ring-8 focus:ring-cyan-500/5"
           />
           <button
@@ -150,7 +150,7 @@ const ChatView: React.FC = () => {
           </button>
         </form>
         <p className="text-center text-[8px] text-slate-700 mt-6 uppercase tracking-[0.4em]">
-          Azmeer Omnis v3.0 Powered by Gemini 3 Flash
+          Azmeer AI Sembang v3.0 - Powered by Gemini
         </p>
       </div>
     </div>

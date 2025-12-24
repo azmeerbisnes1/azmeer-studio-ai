@@ -19,12 +19,10 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   
-  // Wizard states
   const [wizardGender, setWizardGender] = useState<'lelaki' | 'perempuan'>('perempuan');
   const [wizardPlatform, setWizardPlatform] = useState<'tiktok' | 'facebook'>('tiktok');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pollingRef = useRef<number | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,7 +82,7 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
       setImagePreview(null);
       onViewChange(AppView.HISTORY);
     } catch (error: any) {
-      alert(error.message || "Gagal menghubungi kluster GPU.");
+      alert(error.message || "Gagal berhubung dengan pelayan. Sila cuba lagi.");
     } finally {
       setIsGenerating(false);
     }
@@ -96,13 +94,13 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
         <header className="text-center space-y-6 pt-10">
           <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/30 mb-2 backdrop-blur-xl">
              <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_12px_cyan]"></div>
-             <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.4em]">Sora 2.0 Elite Node</span>
+             <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.4em]">Sora 2.0 Elite Studio</span>
           </div>
           <h2 className="text-6xl md:text-8xl font-black text-white tracking-tighter uppercase leading-none">
-            Dream in <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">Motion</span>
+            Jadikan Imaginasi <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">Realiti</span>
           </h2>
           <p className="text-slate-500 text-sm md:text-xl max-w-2xl mx-auto font-medium opacity-80 leading-relaxed">
-            Hampa taip visi sinematik hampa, biar AI kami manifestkan realiti.
+            Hampa taip apa saja video yang hampa nak, biar AI kami buatkan dalam sekelip mata.
           </p>
         </header>
 
@@ -111,7 +109,7 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
             <div className="glass-panel p-8 rounded-[2.5rem] border border-white/5 space-y-6">
               <h3 className="text-[11px] font-black text-cyan-500 uppercase tracking-[0.3em] flex items-center gap-2">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" /></svg>
-                UGC Creator Wizard
+                Bantu Saya Buat Skrip UGC
               </h3>
               
               <div className="space-y-4">
@@ -132,12 +130,12 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
               </div>
 
               <button onClick={handleUGCWizard} disabled={isRefining || !prompt} className="w-full py-4 bg-cyan-600/10 border border-cyan-500/30 text-cyan-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-600 hover:text-white transition-all">
-                {isRefining ? 'Consulting GPT-4o...' : 'Jana Skrip UGC'}
+                {isRefining ? 'Tengah Fikir Skrip...' : 'Jana Skrip Power'}
               </button>
             </div>
 
             <div className="glass-panel p-8 rounded-[2.5rem] border border-white/5 space-y-6">
-               <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.3em]">Temporal Settings</h3>
+               <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.3em]">Tetapan Masa & Saiz</h3>
                <div className="grid grid-cols-2 gap-4">
                   {[10, 15].map(d => (
                     <button key={d} onClick={() => setDuration(d)} className={`py-4 rounded-xl text-[10px] font-black border transition-all ${duration === d ? 'bg-cyan-500/10 border-cyan-500 text-cyan-400 shadow-xl' : 'bg-white/5 border-white/5 text-slate-600'}`}>
@@ -146,7 +144,7 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
                   ))}
                </div>
                <div className="grid grid-cols-2 gap-4">
-                  {[ {l:'9:16', v:'9:16'}, {l:'16:9', v:'16:9'} ].map(r => (
+                  {[ {l:'Tegak (9:16)', v:'9:16'}, {l:'Melintang (16:9)', v:'16:9'} ].map(r => (
                     <button key={r.v} onClick={() => setAspectRatio(r.v)} className={`py-4 rounded-xl text-[10px] font-black border transition-all ${aspectRatio === r.v ? 'bg-cyan-500/10 border-cyan-500 text-cyan-400 shadow-xl' : 'bg-white/5 border-white/5 text-slate-600'}`}>
                       {r.l}
                     </button>
@@ -162,13 +160,13 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
                   <textarea 
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Terangkan info produk hampa kat sini..."
+                    placeholder="Cerita sikit video apa yang hampa nak buat kat sini..."
                     className="w-full bg-transparent border-none outline-none text-2xl md:text-4xl font-black placeholder:text-slate-800 text-white resize-none min-h-[250px] leading-tight custom-scrollbar"
                   />
                   <div className="flex justify-end mt-4">
                     <button onClick={handleMagicRefine} disabled={!prompt.trim() || isRefining} className="flex items-center gap-3 px-6 py-3 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 rounded-2xl transition-all disabled:opacity-30 group/btn">
                       {isRefining ? <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" /> : <svg className="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 24 24"><path d="M7.5 5.6L10 7L8.6 4.5L10 2L7.5 3.4L5 2L6.4 4.5L5 7L7.5 5.6ZM19.5 15.4L17 14L18.4 16.5L17 19L19.5 17.6L22 19L20.6 16.5L22 14L19.5 15.4ZM22 2L19.5 3.4L17 2L18.4 4.5L17 7L19.5 5.6L22 7L20.6 4.5L22 2ZM14.3 5.4L4.7 15L9 19.3L18.6 9.7L14.3 5.4ZM17.1 6.9L14.3 4L13.1 5.2L15.9 8.1L17.1 6.9Z" /></svg>}
-                      <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Cinema Refine</span>
+                      <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Cantikkan Skrip</span>
                     </button>
                   </div>
                 </div>
@@ -186,7 +184,7 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
                   <button onClick={() => fileInputRef.current?.click()} className={`h-20 px-10 rounded-[2rem] border-2 flex items-center justify-center transition-all ${selectedImage ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-slate-500 hover:text-white'}`}>
                     <svg className="w-6 h-6 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" strokeWidth={2}/></svg>
-                    <span className="text-[10px] font-black uppercase tracking-widest">{selectedImage ? 'IMAGE SYNCED' : 'ATTACH REF'}</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">{selectedImage ? 'GAMBAR DIKESAN' : 'GUNA GAMBAR RUJUKAN'}</span>
                   </button>
 
                   <button 
@@ -197,11 +195,11 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
                     {isGenerating ? (
                       <>
                         <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
-                        <span>MANIFESTING...</span>
+                        <span>TENGAH SIAPKAN...</span>
                       </>
                     ) : (
                       <>
-                        <span>Synthesize Sora Video</span>
+                        <span>Mula Buat Video</span>
                         <svg className="w-5 h-5 group-hover/gen:translate-x-2 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                       </>
                     )}
