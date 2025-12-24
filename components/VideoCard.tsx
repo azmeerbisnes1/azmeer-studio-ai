@@ -19,6 +19,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
   const isFailed = status === 3;
   const progress = video.status_percentage || 0;
 
+  // Cleanup blob on unmount
   useEffect(() => {
     return () => {
       if (internalSrc && internalSrc.startsWith('blob:')) {
@@ -28,7 +29,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
   }, [internalSrc]);
 
   /**
-   * Syncs the media to a local Blob for stable preview and download.
+   * Establishes a local link to the video file to bypass CORS and ensure smooth playback.
    */
   const establishNeuralLink = async () => {
     if (!isCompleted || !video.url || isLoadingNeural || internalSrc) return null;
@@ -48,7 +49,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
         return video.url;
       }
     } catch (err) {
-      console.error("Neural Link Sync Failed:", err);
+      console.error("Neural Linkdistorted:", err);
       setVideoError(true);
       setIsLoadingNeural(false);
       return null;
@@ -106,12 +107,13 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       link.click();
       document.body.removeChild(link);
       
-      // Cleanup if we just created this blob temporarily
+      // Temporary blob cleanup
       if (downloadUrl !== internalSrc) {
         setTimeout(() => URL.revokeObjectURL(downloadUrl!), 1000);
       }
     } catch (err) {
       console.error("Download failed:", err);
+      // Fallback
       window.open(video.url, '_blank');
     } finally {
       setIsDownloading(false);
@@ -191,18 +193,24 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
              </button>
           </div>
         ) : (
-          /* Processing Viewport */
+          /* Processing Viewport - Percentage Displayed Here */
           <div className="text-center space-y-8 w-full px-12 py-20 bg-slate-950/40">
-             <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
-                <div className="absolute inset-0 border-4 border-slate-900 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-t-cyan-500 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
-                <div className="text-xl font-black text-cyan-400 font-orbitron">
+             <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
+                <div className="absolute inset-0 border-[6px] border-slate-900 rounded-full"></div>
+                <div 
+                  className="absolute inset-0 border-[6px] border-cyan-500 rounded-full animate-pulse" 
+                  style={{ 
+                    clipPath: `conic-gradient(white ${progress}%, transparent 0)`,
+                    transition: 'clip-path 0.5s ease-in-out'
+                  }}
+                ></div>
+                <div className="text-2xl font-black text-white font-orbitron drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
                   {progress}%
                 </div>
              </div>
              <div className="space-y-2">
-                <p className="text-[9px] font-black uppercase tracking-[0.5em] text-cyan-400 animate-pulse">Encoding Visual Fabric...</p>
-                <p className="text-[8px] font-bold uppercase text-slate-600 tracking-widest">Cinema Engine Sora 2.0</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400 animate-pulse">Rendering Reality...</p>
+                <p className="text-[8px] font-bold uppercase text-slate-600 tracking-[0.2em]">Sora 2.0 Cinema Engine</p>
              </div>
           </div>
         )}
@@ -211,10 +219,10 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       <div className="p-8 flex-grow flex flex-col">
         <div className="flex justify-between items-center mb-6">
           <div className="flex gap-2">
-            <span className="text-[8px] font-black px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">SORA 2</span>
-            <span className="text-[8px] font-black px-2.5 py-1 rounded-lg bg-white/5 text-slate-500 border border-white/5 uppercase tracking-widest">{video.duration}S</span>
+            <span className="text-[8px] font-black px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-widest">SORA 2 ELITE</span>
+            <span className="text-[8px] font-black px-2.5 py-1 rounded-lg bg-white/5 text-slate-500 border border-white/5 uppercase tracking-widest">{video.duration}s</span>
           </div>
-          <span className="text-[9px] font-mono text-slate-700 tracking-tighter uppercase font-bold">NODE_{video.uuid.substring(0, 8)}</span>
+          <span className="text-[9px] font-mono text-slate-700 tracking-tighter uppercase font-bold">ARC_{video.uuid.substring(0, 8)}</span>
         </div>
 
         <p className="text-[12px] text-slate-300 line-clamp-2 italic mb-8 leading-relaxed font-medium">
@@ -232,7 +240,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
             ) : (
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth={2.5}/></svg>
             )}
-            <span>{isDownloading ? 'EXTRACTING...' : 'DOWNLOAD CINEMA'}</span>
+            <span>{isDownloading ? 'Downloading...' : 'Download MP4'}</span>
           </button>
           
           <div className="flex gap-2">
@@ -241,15 +249,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
               disabled={!video.url} 
               className="flex-1 text-[9px] font-black uppercase text-slate-600 hover:text-white transition-all tracking-[0.2em] py-2.5 border border-white/5 rounded-xl hover:bg-white/5"
             >
-              {isCopying ? 'LINK COPIED' : 'COPY NEURAL'}
-            </button>
-            <button 
-              onClick={(e) => { e.stopPropagation(); if (video.url) window.open(video.url, '_blank'); }}
-              disabled={!video.url}
-              className="px-4 text-[9px] font-black uppercase text-slate-600 hover:text-cyan-400 transition-all tracking-[0.2em] py-2.5 border border-white/5 rounded-xl hover:bg-white/5"
-              title="View Raw Source"
-            >
-              RAW
+              {isCopying ? 'Link Copied' : 'Copy URL'}
             </button>
           </div>
         </div>

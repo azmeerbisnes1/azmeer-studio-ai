@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getAllHistory, getSpecificHistory, mapToGeneratedVideo } from '../services/geminigenService.ts';
+import { getSpecificHistory, mapToGeneratedVideo } from '../services/geminigenService.ts';
 import { db } from '../services/supabaseService.ts';
 import { GeneratedVideo, User } from '../types.ts';
 import { VideoCard } from './VideoCard.tsx';
@@ -16,7 +16,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
   const pollingTimerRef = useRef<number | null>(null);
 
   /**
-   * Primary sync function to match Geminigen.ai History.
+   * Deep Sync with Geminigen.ai history for each user-specific UUID.
    */
   const fetchHistory = useCallback(async (showLoading = true) => {
     if (!user || !user.username) {
@@ -28,24 +28,36 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
     setError(null);
     
     try {
-      // 1. Get user specific UUIDs from Supabase
+      // 1. Get user specific UUIDs from Supabase Archive
       const userUuids = await db.getUuids(user.username);
       
-      // 2. Fetch all history from Geminigen to sync metadata
-      const allHistoryResponse = await getAllHistory(1, 50);
-      const geminigenItems = allHistoryResponse?.result || allHistoryResponse?.data || [];
+      if (!userUuids || userUuids.length === 0) {
+        setHistory([]);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Multi-fetch live details for each UUID from Geminigen to get per-second updates
+      // This ensures the percentage and status are always fresh from the source
+      const videoDataPromises = userUuids.map(uuid => 
+        getSpecificHistory(uuid).catch(err => {
+          console.error(`Link distorted for node ${uuid}:`, err);
+          return null;
+        })
+      );
       
-      // 3. Filter to only show videos that belong to this user (via Supabase UUID list)
-      // and map them correctly to the UI model.
-      const matchedItems = geminigenItems
-        .filter((item: any) => userUuids.includes(item.uuid))
-        .map((item: any) => mapToGeneratedVideo(item));
+      const rawResults = await Promise.all(videoDataPromises);
+      
+      // 3. Filter failed fetches and map to UI model
+      const videoItems = rawResults
+        .filter(item => item !== null && (item.uuid || item.id))
+        .map(item => mapToGeneratedVideo(item))
+        .sort((a, b) => b.timestamp - a.timestamp);
+          
+      setHistory(videoItems);
 
-      // 4. Update local state
-      setHistory(matchedItems.sort((a, b) => b.timestamp - a.timestamp));
-
-      // 5. Check if we need to poll for updates (if any video is processing [status 1])
-      const hasActiveTasks = matchedItems.some(v => v.status === 1);
+      // 4. Intelligence Polling: If any video is still processing (Status 1)
+      const hasActiveTasks = videoItems.some(v => Number(v.status) === 1);
       
       if (pollingTimerRef.current) {
         window.clearTimeout(pollingTimerRef.current);
@@ -53,12 +65,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       }
 
       if (hasActiveTasks) {
-        // Poll every 5 seconds for real-time percentage updates
+        // High-frequency polling (5s) to capture percentage changes
         pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 5000);
       }
     } catch (err: any) {
-      console.error("Sync Error:", err);
-      setError("Gagal menyelaraskan Arkib Video dengan Geminigen.ai.");
+      console.error("Neural Vault Sync Error:", err);
+      setError("Gagal menyelaraskan arkib dengan Geminigen.ai.");
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -78,10 +90,10 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-2.5 h-2.5 rounded-full bg-cyan-500 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
-              <p className="text-cyan-500 text-[10px] font-black uppercase tracking-[0.5em]">Arkib Koleksi Video</p>
+              <p className="text-cyan-500 text-[10px] font-black uppercase tracking-[0.5em]">Neural Archive Vault</p>
             </div>
             <h2 className="text-5xl md:text-7xl font-black text-white tracking-tighter uppercase leading-none">
-              Vault <span className="text-slate-900 stroke-text">Sora 2.0</span>
+              Cinema <span className="text-slate-900 stroke-text">History</span>
             </h2>
           </div>
           <button 
@@ -92,14 +104,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
             <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            {loading ? 'SYNCING...' : 'REFRESH ARKIB'}
+            {loading ? 'SYNCING...' : 'SYNC VAULT'}
           </button>
         </header>
 
         {error && (
           <div className="mb-10 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl text-center animate-up">
-             <p className="text-red-400 text-xs font-bold uppercase tracking-widest mb-2">Sync Error</p>
-             <p className="text-red-300 text-[10px]">{error}</p>
+             <p className="text-red-400 text-[10px] font-black uppercase tracking-widest">Neural Distorted: {error}</p>
           </div>
         )}
 
@@ -108,7 +119,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
             <div className="w-20 h-20 bg-slate-900/50 rounded-full flex items-center justify-center mx-auto mb-6">
                <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" strokeWidth={1}/></svg>
             </div>
-            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">Tiada rekod video ditemui dalam arkib anda.</p>
+            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">Arkib Kosong.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 pb-40">
