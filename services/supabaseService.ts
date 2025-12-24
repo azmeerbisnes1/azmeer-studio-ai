@@ -1,90 +1,69 @@
 
 /**
- * PENTING: Untuk aplikasi yang dibina dengan Vite, pembolehubah persekitaran 
- * MESTI diakses secara selamat. Ralat 'Cannot read properties of undefined' 
- * berlaku jika import.meta.env diakses secara terus dalam persekitaran 
- * yang tidak menyokongnya.
+ * PENTING UNTUK VITE & VERCEL:
+ * Pembolehubah persekitaran (Env Vars) dikesan menggunakan pelbagai kaedah 
+ * untuk memastikan keserasian merentas platform (Vite, Vercel, Sandbox).
  */
 
-const getSupabaseUrl = (): string => {
+const getEnvValue = (key: string): string => {
+  const viteKey = `VITE_SUPABASE_${key}`;
+  const standardKey = `SUPABASE_${key}`;
+
+  // 1. Cuba akses melalui process.env (Paling stabil dalam sandbox/node environments)
   try {
-    // 1. Cuba akses statik Vite secara selamat (Statik Replacement)
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) {
-      // @ts-ignore
-      return import.meta.env.VITE_SUPABASE_URL.trim();
-    }
-    
-    // 2. Fallback kepada process.env (Standard Node/Vercel)
     if (typeof process !== 'undefined' && process.env) {
-      const val = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const val = process.env[viteKey] || process.env[standardKey];
       if (val) return val.trim();
     }
+  } catch (e) {}
 
-    // 3. Fallback terakhir kepada window (Jika disuntik secara global)
+  // 2. Cuba akses melalui import.meta.env (Standard untuk Vite/ESM)
+  try {
+    // @ts-ignore
+    const metaEnv = import.meta.env;
+    if (metaEnv) {
+      const val = metaEnv[viteKey] || metaEnv[standardKey];
+      if (val) return val.trim();
+    }
+  } catch (e) {}
+
+  // 3. Cuba akses melalui window (Fallback terakhir)
+  try {
     if (typeof window !== 'undefined') {
       const win = window as any;
-      const val = win.VITE_SUPABASE_URL || win.SUPABASE_URL;
+      const val = win[viteKey] || win[standardKey] || win.env?.[viteKey] || win.env?.[standardKey];
       if (val) return val.trim();
     }
-  } catch (e) {
-    console.error("Gagal mengesan Supabase URL:", e);
-  }
+  } catch (e) {}
+
   return "";
 };
 
-const getSupabaseAnonKey = (): string => {
-  try {
-    // 1. Cuba akses statik Vite secara selamat
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) {
-      // @ts-ignore
-      return import.meta.env.VITE_SUPABASE_ANON_KEY.trim();
-    }
+const SUPABASE_URL = getEnvValue('URL');
+const SUPABASE_ANON_KEY = getEnvValue('ANON_KEY');
 
-    // 2. Fallback kepada process.env
-    if (typeof process !== 'undefined' && process.env) {
-      const val = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-      if (val) return val.trim();
-    }
-
-    // 3. Fallback terakhir kepada window
-    if (typeof window !== 'undefined') {
-      const win = window as any;
-      const val = win.VITE_SUPABASE_ANON_KEY || win.SUPABASE_ANON_KEY;
-      if (val) return val.trim();
-    }
-  } catch (e) {
-    console.error("Gagal mengesan Supabase Key:", e);
-  }
-  return "";
-};
-
-const SUPABASE_URL = getSupabaseUrl();
-const SUPABASE_ANON_KEY = getSupabaseAnonKey();
-
-// Log Diagnostik untuk membantu pengguna membetulkan ralat konfigurasi
+// Log Diagnostik Berwarna untuk Console
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.group("🆘 AZMEER AI: AMARAN DATABASE");
-  console.error("URL Status:", SUPABASE_URL ? "✅ Dikesan" : "❌ MISSING (Tiada)");
-  console.error("Key Status:", SUPABASE_ANON_KEY ? "✅ Dikesan" : "❌ MISSING (Tiada)");
-  console.warn("TINDAKAN SEGERA:");
-  console.info("1. Sila ke Dashboard Vercel > Settings > Environment Variables.");
-  console.info("2. Tambah dua variable ini: VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY.");
-  console.info("3. PENTING: Anda WAJIB klik 'Save' dan lakukan 'REDEPLOY' pada projek anda.");
-  console.groupEnd();
+  console.log(
+    `%c 🆘 AZMEER AI: MASALAH DATABASE %c\n` +
+    `URL: ${SUPABASE_URL ? '✅ OK' : '❌ TIADA'}\n` +
+    `KEY: ${SUPABASE_ANON_KEY ? '✅ OK' : '❌ TIADA'}\n\n` +
+    `TINDAKAN SEGERA:\n` +
+    `1. Buka Vercel Dashboard > Settings > Environment Variables.\n` +
+    `2. Pastikan nama variable adalah TEPAT: VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY.\n` +
+    `3. WAJIB klik 'REDEPLOY' selepas anda simpan variable tersebut.\n`,
+    "background: #ef4444; color: white; font-weight: bold; padding: 4px 8px; border-radius: 4px;",
+    "color: #ef4444; font-weight: bold;"
+  );
 } else {
-  console.log("🚀 Supabase Engine: Successfully Initialized.");
+  console.log("%c 🚀 Supabase: Connected! %c Sistem Sedia.", "background: #10b981; color: white; padding: 2px 5px; border-radius: 3px;", "color: #10b981;");
 }
 
 /**
  * Enjin permintaan (request engine) untuk berinteraksi dengan Supabase REST API.
  */
 const supabaseRequest = async (path: string, options: RequestInit = {}) => {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.warn("Permintaan Supabase dibatalkan: Kunci API tidak lengkap.");
-    return null;
-  }
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
   
   const headers = {
     'apikey': SUPABASE_ANON_KEY,
@@ -97,7 +76,12 @@ const supabaseRequest = async (path: string, options: RequestInit = {}) => {
     const baseUrl = SUPABASE_URL.replace(/\/+$/, "");
     const url = `${baseUrl}/rest/v1/${path}`;
     
-    const response = await fetch(url, { ...options, headers, mode: 'cors' });
+    const response = await fetch(url, { 
+      ...options, 
+      headers, 
+      mode: 'cors',
+      cache: 'no-store' 
+    });
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -114,14 +98,8 @@ const supabaseRequest = async (path: string, options: RequestInit = {}) => {
 };
 
 export const db = {
-  /**
-   * Semak jika pangkalan data sedia untuk digunakan.
-   */
   isReady: () => !!(SUPABASE_URL && SUPABASE_ANON_KEY),
 
-  /**
-   * Simpan atau kemaskini profil pengguna.
-   */
   saveUser: async (username: string, password: string, userData: any) => {
     return await supabaseRequest('azmeer_users', {
       method: 'POST',
@@ -134,9 +112,6 @@ export const db = {
     });
   },
 
-  /**
-   * Kemaskini data pengguna mengikut username.
-   */
   updateUser: async (username: string, userData: any) => {
     return await supabaseRequest(`azmeer_users?username=eq.${username.toLowerCase().trim()}`, {
       method: 'PATCH',
@@ -144,17 +119,11 @@ export const db = {
     });
   },
 
-  /**
-   * Ambil maklumat pengguna tunggal.
-   */
   getUser: async (username: string) => {
     const data = await supabaseRequest(`azmeer_users?username=eq.${username.toLowerCase().trim()}&select=*`);
     return data && data.length > 0 ? data[0] : null;
   },
 
-  /**
-   * Simpan ID video yang dijana ke arkib peribadi.
-   */
   saveUuid: async (userId: string, uuid: string) => {
     return await supabaseRequest('azmeer_uuids', {
       method: 'POST',
@@ -165,17 +134,11 @@ export const db = {
     });
   },
 
-  /**
-   * Ambil semua senarai UUID video milik pengguna.
-   */
   getUuids: async (userId: string) => {
     const data = await supabaseRequest(`azmeer_uuids?user_id=eq.${userId.toLowerCase().trim()}&select=uuid`);
     return data ? data.map((d: any) => d.uuid) : [];
   },
 
-  /**
-   * Fungsi khas Admin untuk melihat semua pengguna.
-   */
   getAllUsers: async () => {
     const data = await supabaseRequest('azmeer_users?select=*&order=created_at.desc');
     return data ? data : [];

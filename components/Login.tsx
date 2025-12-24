@@ -21,7 +21,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     // Semakan Diagnostic - Jika database tidak sedia, berikan amaran jelas
     if (!db.isReady()) {
-      setError('AMARAN: Sistem database tidak dikesan. Sila pastikan VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY telah dimasukkan ke dalam Dashboard Vercel.');
+      setError('DATABASE ERROR: Sila pastikan VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY telah dimasukkan di Vercel dan anda telah melakukan REDEPLOY.');
       setIsProcessing(false);
       return;
     }
@@ -118,6 +118,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 bg-slate-950 relative overflow-hidden">
       <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #1e293b 1px, transparent 0)', backgroundSize: '32px 32px' }}></div>
+      {!db.isReady() && (
+        <div className="fixed top-0 left-0 w-full bg-red-600 text-white text-[10px] font-black uppercase tracking-widest py-2 text-center z-50">
+          ⚠️ CONFIGURATION ERROR: Supabase Keys are Missing from Environment Variables
+        </div>
+      )}
       <div className="max-w-xl w-full glass-panel rounded-[4rem] p-10 sm:p-20 text-center border-white/10 relative z-10 animate-up">
         <div className="mb-14 sm:mb-20 flex justify-center">
           <div className="cyber-logo-wrapper hover:scale-110"><div className="logo-glow-ring !w-[180%] !h-[180%]"></div><img src={LOGO_URL} alt="Azmeer AI Logo" className="cyber-logo-img !w-32 !h-32 sm:!w-48 sm:!h-48" /></div>
