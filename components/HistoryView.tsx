@@ -33,10 +33,10 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
         return;
       }
 
-      // 2. Deep Sync dengan server Geminigen
+      // 2. Deep Sync dengan server Geminigen secara real-time
       const videoDataPromises = userUuids.map(uuid => 
         getSpecificHistory(uuid).catch(err => {
-          console.error(`Sync failure for ${uuid}:`, err);
+          console.warn(`Sync warning for ${uuid}:`, err);
           return null;
         })
       );
@@ -50,7 +50,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
           
       setHistory(videoItems);
 
-      // 3. Polling Logic
+      // 3. Polling Logic - jika ada video masih 'Processing' (status 1)
       const hasActiveTasks = videoItems.some(v => Number(v.status) === 1);
       
       if (pollingTimerRef.current) {
@@ -64,8 +64,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       
       setError(null);
     } catch (err: any) {
-      console.error("Vault Logic Error:", err);
-      setError("Gagal menyambung ke Arkib Pusat. Sila cuba lagi sebentar.");
+      console.error("Vault Error:", err);
+      setError("Gagal menyambung ke Arkib Pusat. Sila refresh semula.");
     } finally {
       if (showLoading) setLoading(false);
     }

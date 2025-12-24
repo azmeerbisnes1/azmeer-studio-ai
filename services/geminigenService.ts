@@ -3,7 +3,7 @@ import { GeneratedVideo } from "../types.ts";
 import { GoogleGenAI } from "@google/genai";
 
 /**
- * Geminigen API Key System (Hardcoded as per request)
+ * Geminigen API Key System
  */
 const GEMINIGEN_API_KEY = "tts-fe9842ffd74cffdf095bb639e1b21a01";
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
@@ -20,7 +20,7 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
     ...((options.headers as any) || {})
   };
 
-  // Jangan set Content-Type jika menggunakan FormData (browser akan set secara automatik dengan boundary)
+  // Jangan set Content-Type jika menggunakan FormData
   if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
     headers["Accept"] = "application/json";
@@ -48,7 +48,7 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
 
     return data;
   } catch (err: any) {
-    console.error("Geminigen API Connection Error:", err.message);
+    console.error("Geminigen API Error:", err.message);
     throw err;
   }
 }
@@ -58,7 +58,6 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
  */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   if (!uuid) return null;
-  // Endpoint mengikut dokumentasi: /uapi/v1/history/{conversion_uuid}
   return await uapiFetch(`/history/${uuid}`);
 };
 
@@ -82,7 +81,7 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
 };
 
 /**
- * Penjanaan Video Sora 2.0 (Sora-2 sahaja mengikut permintaan)
+ * Penjanaan Video Sora 2.0 (Sora-2 sahaja)
  */
 export const startVideoGen = async (params: { 
   prompt: string; 
@@ -92,9 +91,9 @@ export const startVideoGen = async (params: {
 }): Promise<any> => {
   const formData = new FormData();
   formData.append('prompt', params.prompt);
-  formData.append('model', 'sora-2'); // Hardcoded sora-2
-  formData.append('resolution', 'small'); // sora-2 hanya sokong small
-  formData.append('duration', String(params.duration || 10)); // 10 atau 15
+  formData.append('model', 'sora-2');
+  formData.append('resolution', 'small');
+  formData.append('duration', String(params.duration || 10));
   formData.append('aspect_ratio', params.ratio === '16:9' ? 'landscape' : 'portrait');
   
   if (params.imageFile) {
@@ -108,7 +107,7 @@ export const startVideoGen = async (params: {
 };
 
 /**
- * Membersihkan URL dan menambah domain jika perlu
+ * Normalisasi URL
  */
 const normalizeUrl = (url: any): string => {
   if (!url || typeof url !== 'string') return "";
@@ -119,7 +118,7 @@ const normalizeUrl = (url: any): string => {
 };
 
 /**
- * Pemetaan Data Berdasarkan Respons Rasmi Get Specific History
+ * Pemetaan Data Berdasarkan Dokumentasi Rasmi Get Specific History
  */
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
@@ -127,11 +126,11 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   const status = item.status !== undefined ? Number(item.status) : 1;
   const percentage = item.status_percentage !== undefined ? Number(item.status_percentage) : (status === 2 ? 100 : 0);
 
-  // Cari data video dalam array generated_video
+  // Cari data video dalam array generated_video seperti dalam JSON respons
   const vList = item.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
-  // Ambil URL daripada punca yang paling dipercayai (video_url atau video_uri)
+  // Ambil URL daripada punca yang paling dipercayai (video_url di dalam array generated_video)
   const rawUrl = vData.video_url || item.generate_result || "";
   const rawThumb = vData.last_frame || item.thumbnail_url || "";
 
@@ -156,7 +155,6 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
   if (!url || !url.startsWith('http')) return url;
   
-  // Gunakan proxy untuk bypass CORS dan membolehkan pembacaan blob
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
   
   try {
@@ -164,7 +162,7 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
     if (!response.ok) throw new Error("Fetch failed");
     
     const rawBlob = await response.blob();
-    // PAKSA jenis fail kepada video/mp4
+    // Force format kepada video/mp4 supaya browser boleh mainkan
     const videoBlob = new Blob([rawBlob], { type: 'video/mp4' });
     return URL.createObjectURL(videoBlob);
   } catch (e) {
