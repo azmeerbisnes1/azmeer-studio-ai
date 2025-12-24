@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../services/supabaseService';
 
 interface LoginProps {
@@ -9,41 +9,51 @@ interface LoginProps {
 const LOGO_URL = "https://i.ibb.co/b5N15CGf/Untitled-design-18.png";
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'setup'>('login');
   const [formData, setFormData] = useState({ email: '', username: '', password: '' });
+  const [setupData, setSetupData] = useState({ url: '', key: '' });
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isConfigReady, setIsConfigReady] = useState(true);
+
+  useEffect(() => {
+    const ready = db.isReady();
+    setIsConfigReady(ready);
+    if (!ready) setMode('setup');
+  }, []);
+
+  const handleSetup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (setupData.url && setupData.key) {
+      db.setManualKeys(setupData.url, setupData.key);
+    } else {
+      setError('Sila masukkan kedua-dua URL dan Key.');
+    }
+  };
 
   const handleAction = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isConfigReady) return;
+
     setIsProcessing(true);
     setError('');
 
-    // Semakan awal jika API Key belum dimasukkan di Vercel
-    if (!db.isReady()) {
-      setError('TETAPAN DIPERLUKAN: Sila masukkan VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY di bahagian Environment Variables dalam Vercel Dashboard anda.');
-      setIsProcessing(false);
-      return;
-    }
-
     const cleanUsername = formData.username.toLowerCase().trim();
 
-    if (mode === 'login') {
-      try {
+    try {
+      if (mode === 'login') {
         const remoteUser = await db.getUser(cleanUsername);
         
         if (remoteUser && remoteUser.error) {
           setError(remoteUser.error);
         } else if (remoteUser && remoteUser.password === formData.password) {
           onLogin(remoteUser.data);
+        } else if (remoteUser === null) {
+          setError('ID Pengguna tidak dijumpai.');
         } else {
-          setError('ID Pengguna atau Kata Laluan tidak sah. Sila cuba lagi.');
+          setError('Kata laluan salah.');
         }
-      } catch (err) {
-        setError('Masalah rangkaian dikesan. Sila muat semula halaman.');
-      }
-    } else {
-      try {
+      } else if (mode === 'signup') {
         const existing = await db.getUser(cleanUsername);
         
         if (existing && existing.error) {
@@ -53,7 +63,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         }
 
         if (existing) { 
-          setError('ID Pengguna ini sudah didaftarkan.'); 
+          setError('ID Pengguna sudah didaftarkan.'); 
           setIsProcessing(false); 
           return; 
         }
@@ -73,14 +83,56 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         if (res && !res.error) {
           onLogin(newUser);
         } else {
-          setError(res?.error || 'Pendaftaran gagal. Sila pastikan database Supabase anda aktif.');
+          setError(res?.error || 'Pendaftaran gagal.');
         }
-      } catch (err) {
-        setError('Proses pendaftaran terganggu.');
       }
+    } catch (err: any) {
+      setError(`Ralat Sistem: ${err.message}`);
     }
     setIsProcessing(false);
   };
+
+  if (mode === 'setup') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 font-sans">
+        <div className="max-w-md w-full glass-panel rounded-[3rem] p-10 text-center border-amber-500/20">
+          <div className="mb-6 text-amber-500 flex justify-center">
+            <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          </div>
+          <h2 className="text-xl font-black text-white uppercase mb-4">Setup Diperlukan</h2>
+          <p className="text-xs text-slate-400 mb-8 leading-relaxed">
+            Google AI Studio dikesan. Sila masukkan kredensial Supabase anda secara manual untuk mengaktifkan fungsi login di persekitaran ini.
+          </p>
+          <form onSubmit={handleSetup} className="space-y-4 text-left">
+            <div className="space-y-1">
+              <label className="text-[8px] font-black text-slate-600 uppercase tracking-widest ml-4">Supabase URL</label>
+              <input 
+                type="text" 
+                placeholder="https://xyz.supabase.co" 
+                className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-xs text-white outline-none focus:border-amber-500" 
+                onChange={e => setSetupData({...setupData, url: e.target.value})}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[8px] font-black text-slate-600 uppercase tracking-widest ml-4">Anon Key</label>
+              <input 
+                type="password" 
+                placeholder="eyJhbG..." 
+                className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-xs text-white outline-none focus:border-amber-500" 
+                onChange={e => setSetupData({...setupData, key: e.target.value})}
+              />
+            </div>
+            <button type="submit" className="w-full py-4 bg-amber-600 hover:bg-amber-500 rounded-2xl font-black text-[10px] uppercase text-white tracking-widest transition-all">
+              SIMPAN & AKTIFKAN
+            </button>
+          </form>
+          {isConfigReady && (
+             <button onClick={() => setMode('login')} className="mt-4 text-[9px] text-slate-600 hover:text-white uppercase tracking-widest">Guna Kunci Sedia Ada</button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 relative overflow-hidden font-sans">
@@ -114,15 +166,16 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           
           {error && (
             <div className="mt-6 p-5 bg-red-500/10 border border-red-500/20 rounded-2xl animate-up">
-               <p className="text-[10px] text-red-400 font-bold leading-relaxed">
-                 {error}
-               </p>
+               <p className="text-[10px] text-red-400 font-bold leading-relaxed">{error}</p>
             </div>
           )}
           
-          <div className="text-center mt-6">
+          <div className="text-center mt-6 flex flex-col gap-3">
             <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-[10px] font-bold text-slate-500 uppercase hover:text-white transition-all tracking-widest">
               {mode === 'login' ? 'Belum ada akaun? Daftar Sini' : 'Sudah ada akaun? Log Masuk'}
+            </button>
+            <button type="button" onClick={() => setMode('setup')} className="text-[8px] font-black text-slate-700 hover:text-amber-500 uppercase tracking-[0.2em] transition-all">
+              ⚙️ Tetapan Manual Supabase
             </button>
           </div>
         </form>

@@ -4,7 +4,6 @@ import { AppView, User } from './types.ts';
 import Sidebar from './components/Sidebar.tsx';
 import SoraStudioView from './components/SoraStudioView.tsx';
 import HistoryView from './components/HistoryView.tsx';
-import WebVideoView from './components/WebVideoView.tsx';
 import { AdminDashboard } from './components/AdminDashboard.tsx';
 import { Login } from './components/Login.tsx';
 import { db } from './services/supabaseService.ts';
@@ -12,7 +11,7 @@ import { db } from './services/supabaseService.ts';
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<AppView>(AppView.SORA_STUDIO);
   const [user, setUser] = useState<User | null>(null);
-  const logoUrl = "https://i.ibb.co/xqgH2MQ4/Untitled-design-18.png";
+  const logoUrl = "https://i.ibb.co/b5N15CGf/Untitled-design-18.png";
 
   useEffect(() => {
     const savedUser = localStorage.getItem('azmeer_active_user');
@@ -61,12 +60,7 @@ const App: React.FC = () => {
            <p className="text-slate-400 text-sm leading-relaxed mb-10">
               Hai <span className="text-cyan-400 font-bold">{user.username}</span>, akaun anda sedang dalam proses semakan oleh <span className="text-white font-bold">Admin Azmeer</span>. Sila tunggu sehingga akaun anda disahkan untuk mula menggunakan studio.
            </p>
-           <div className="space-y-4">
-              <div className="bg-amber-500/5 border border-amber-500/10 p-5 rounded-2xl">
-                 <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Status: Menunggu Kelulusan</p>
-              </div>
-              <button onClick={handleLogout} className="w-full py-5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all">Log Keluar</button>
-           </div>
+           <button onClick={handleLogout} className="w-full py-5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all">Log Keluar</button>
         </div>
       </div>
     );
@@ -75,7 +69,6 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (activeView) {
       case AppView.SORA_STUDIO: return <SoraStudioView onViewChange={setActiveView} user={user} onUserUpdate={setUser} />;
-      case AppView.WEBCINEMA: return <WebVideoView onViewChange={setActiveView} user={user} onUserUpdate={setUser} />;
       case AppView.HISTORY: return <HistoryView user={user} />;
       case AppView.ADMIN: return <AdminDashboard currentUser={user} />;
       default: return <SoraStudioView onViewChange={setActiveView} user={user} onUserUpdate={setUser} />;
@@ -87,25 +80,23 @@ const App: React.FC = () => {
       <Sidebar activeView={activeView} onViewChange={setActiveView} user={user} />
 
       <main className="flex-1 relative flex flex-col min-w-0 overflow-hidden">
-        <header className="md:hidden flex flex-col bg-[#020617] border-b border-slate-800/50 z-20">
+        <header className="md:hidden flex flex-col bg-[#020617] border-b border-white/5 z-20">
           <div className="flex items-center justify-between p-4 px-5">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 relative flex items-center justify-center">
-                <div className="absolute inset-0 bg-cyan-500/20 blur-lg rounded-full animate-pulse"></div>
                 <img src={logoUrl} alt="Logo" className="w-full h-full object-contain relative z-10" />
               </div>
               <div>
                 <h1 className="text-sm font-black tracking-tighter text-white uppercase leading-none">azmeer</h1>
-                <p className="text-[8px] font-bold text-cyan-500 tracking-[0.2em] uppercase opacity-80 leading-none">ai studio</p>
+                <p className="text-[8px] font-bold text-cyan-500 tracking-[0.2em] uppercase leading-none">ai studio</p>
               </div>
             </div>
             <button onClick={handleLogout} className="text-[8px] font-black text-slate-500 uppercase tracking-widest border border-slate-800 px-3 py-1.5 rounded-lg">Logout</button>
           </div>
 
-          <nav className="flex px-4 pb-3 gap-2 overflow-x-auto custom-scrollbar">
+          <nav className="flex px-4 pb-3 gap-2 overflow-x-auto">
             {[
               { id: AppView.SORA_STUDIO, label: 'Studio' },
-              { id: AppView.WEBCINEMA, label: 'Web' },
               { id: AppView.HISTORY, label: 'Koleksi' },
               ...(user.role === 'admin' ? [{ id: AppView.ADMIN, label: 'Admin' }] : [])
             ].map(item => (
@@ -113,7 +104,7 @@ const App: React.FC = () => {
                 key={item.id}
                 onClick={() => setActiveView(item.id)}
                 className={`flex-none px-6 py-3 rounded-xl transition-all border font-black text-[10px] uppercase tracking-widest ${
-                  activeView === item.id ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400' : 'bg-slate-900/50 border-slate-800 text-slate-500'
+                  activeView === item.id ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400' : 'bg-slate-900/50 border-white/5 text-slate-500'
                 }`}
               >
                 {item.label}

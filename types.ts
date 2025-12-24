@@ -5,8 +5,7 @@ export type Resolution = '720p' | '1080p';
 export enum AppView {
   SORA_STUDIO = 'SORA_STUDIO',
   HISTORY = 'HISTORY',
-  ADMIN = 'ADMIN',
-  WEBCINEMA = 'WEBCINEMA'
+  ADMIN = 'ADMIN'
 }
 
 export interface User {
@@ -29,54 +28,54 @@ export interface GeneratedVideo {
   mediaType: 'video';
   uuid: string;
   url: string;
+  thumbnail?: string;
   prompt: string;
   timestamp: number;
-  status: 1 | 2 | 3;
+  status: 1 | 2 | 3; // 1: Processing, 2: Completed, 3: Failed
   status_percentage: number;
   aspectRatio: string;
   model_name: string;
   duration: number;
 }
 
+// Added GeneratedImage type
 export interface GeneratedImage {
-  mediaType: 'image';
   uuid: string;
   url: string;
   prompt: string;
-  timestamp: number;
   aspectRatio: string;
   style?: string;
 }
 
+// Added GeneratedTTS type
 export interface GeneratedTTS {
-  mediaType: 'tts';
   uuid: string;
   url: string;
   prompt: string;
-  timestamp: number;
   status: number | string;
   voice: string;
   speed: number;
 }
 
-export interface SoraHistoryItem {
-  uuid: string;
-  status: number | string;
-  status_percentage?: number;
-  status_desc?: string;
-  model_name?: string;
-  created_at: string;
-  input_text: string;
-  generated_video?: Array<{
-    video_url?: string;
-    video_uri?: string;
-  }>;
-  generate_result?: string;
-}
-
+// Added ChatMessage type
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   content: string;
   timestamp: number;
+}
+
+// Added SoraHistoryItem type
+export interface SoraHistoryItem {
+  uuid: string;
+  status: string | number;
+  status_percentage: number;
+  model_name: string;
+  created_at: string;
+  input_text: string;
+  status_desc: string;
+  type?: string;
+  inference_type?: string;
+  generate_result?: any;
+  generated_video?: any[];
 }

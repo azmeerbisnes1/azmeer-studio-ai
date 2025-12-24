@@ -9,48 +9,41 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, user }) => {
-  const logoUrl = "https://i.ibb.co/xqgH2MQ4/Untitled-design-18.png";
+  const logoUrl = "https://i.ibb.co/b5N15CGf/Untitled-design-18.png";
 
   const navItems = [
     { id: AppView.SORA_STUDIO, label: 'Studio Video', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z" /></svg>
     )},
-    { id: AppView.WEBCINEMA, label: 'Web Generator', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-    )},
     { id: AppView.HISTORY, label: 'Koleksi Video', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
     )},
   ];
 
-  // Tambah menu admin jika user adalah admin
   if (user?.role === 'admin') {
-    navItems.push({ id: AppView.ADMIN, label: 'Panel Admin', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m16-10V7a4 4 0 11-8 0v4M12 11h10m-5-5v10" /></svg>
+    navItems.push({ id: AppView.ADMIN, label: 'Admin', icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
     )});
   }
 
   return (
-    <aside className="hidden md:flex flex-col w-72 bg-[#020617] border-r border-slate-800/50 h-full p-8">
-      <div className="flex items-center gap-4 mb-16">
-        <div className="w-12 h-12 relative flex items-center justify-center">
-          <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full"></div>
-          <img src={logoUrl} alt="Logo" className="w-full h-full object-contain relative z-10" />
-        </div>
+    <aside className="hidden md:flex flex-col w-72 bg-[#020617] border-r border-white/5 h-full p-8 relative z-30">
+      <div className="flex items-center gap-4 mb-16 px-2">
+        <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain" />
         <div>
           <h1 className="text-xl font-black text-white uppercase tracking-tighter leading-none">Azmeer</h1>
           <p className="text-[10px] font-bold text-cyan-500 uppercase tracking-widest mt-1">AI Studio</p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-3">
+      <nav className="flex-1 space-y-2">
         {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onViewChange(item.id)}
-            className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold text-xs uppercase tracking-widest border ${
+            className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 font-bold text-[10px] uppercase tracking-widest border ${
               activeView === item.id 
-              ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.05)]' 
+              ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-400' 
               : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5'
             }`}
           >
@@ -60,13 +53,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, user }) => 
         ))}
       </nav>
 
-      <div className="mt-auto pt-8 border-t border-slate-800/50">
-        <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/50">
-          <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Status Sistem AI</p>
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-[9px] font-bold text-emerald-500/80 uppercase">Sedia Berkhidmat</span>
-          </div>
+      <div className="mt-auto pt-8 border-t border-white/5">
+        <div className="p-5 rounded-2xl bg-slate-900/40 border border-white/5 text-center">
+          <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Sora 2.0 Engine</p>
+          <p className="text-[9px] font-bold text-emerald-500 uppercase">Live Connection</p>
         </div>
       </div>
     </aside>

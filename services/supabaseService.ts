@@ -1,6 +1,6 @@
 
 /**
- * Fungsi pengesan env yang sangat agresif untuk Vercel/Vite.
+ * Fungsi pengesan env yang sangat agresif untuk Vercel/Vite/Local/Sandbox.
  */
 const getEnv = (key: string): string => {
   const variations = [
@@ -9,7 +9,6 @@ const getEnv = (key: string): string => {
     `NEXT_PUBLIC_SUPABASE_${key}`
   ];
 
-  // Cubaan 1: import.meta.env
   try {
     // @ts-ignore
     const meta = import.meta.env;
@@ -20,7 +19,6 @@ const getEnv = (key: string): string => {
     }
   } catch (e) {}
 
-  // Cubaan 2: process.env
   try {
     if (typeof process !== 'undefined' && process.env) {
       for (const v of variations) {
@@ -29,37 +27,36 @@ const getEnv = (key: string): string => {
     }
   } catch (e) {}
 
-  // Cubaan 3: Global/Window
   try {
-    if (typeof window !== 'undefined') {
-      for (const v of variations) {
-        if ((window as any)[v]) return (window as any)[v].trim();
-      }
-    }
+    const local = localStorage.getItem(`AZMEER_SUPABASE_${key}`);
+    if (local) return local.trim();
   } catch (e) {}
 
   return "";
 };
 
-const SUPABASE_URL = getEnv('URL');
-const SUPABASE_ANON_KEY = getEnv('ANON_KEY');
+let SUPABASE_URL = getEnv('URL');
+let SUPABASE_ANON_KEY = getEnv('ANON_KEY');
+
+// Helper to safely handle strings
+const safeLower = (str: any) => (str ? String(str).toLowerCase().trim() : "");
 
 export const db = {
-  /**
-   * Semakan jika aplikasi mempunyai kredensial yang cukup
-   */
   isReady: () => {
     return !!(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith('http'));
   },
 
-  /**
-   * Request handler yang selamat daripada ralat 'Unexpected end of JSON input'
-   */
+  setManualKeys: (url: string, key: string) => {
+    localStorage.setItem('AZMEER_SUPABASE_URL', url.trim());
+    localStorage.setItem('AZMEER_SUPABASE_ANON_KEY', key.trim());
+    SUPABASE_URL = url.trim();
+    SUPABASE_ANON_KEY = key.trim();
+    window.location.reload();
+  },
+
   request: async (path: string, options: RequestInit = {}) => {
     if (!db.isReady()) {
-      return { 
-        error: "TETAPAN DIPERLUKAN: Sila masukkan VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY di Vercel Settings dan lakukan REDEPLOY (uncheck build cache)." 
-      };
+      return { error: `Konfigurasi Supabase tidak lengkap.` };
     }
     
     const headers = {
@@ -74,45 +71,34 @@ export const db = {
       const url = `${baseUrl}/rest/v1/${path}`;
       
       const response = await fetch(url, { ...options, headers });
-      
-      // Ambil teks dahulu, JANGAN guna .json() terus
       const rawText = await response.text();
-      
       let data: any = null;
+      
       if (rawText && rawText.trim().length > 0) {
         try {
           data = JSON.parse(rawText);
         } catch (e) {
-          // Jika gagal parse, ia mungkin bukan JSON yang sah
-          console.warn("Respon bukan JSON:", rawText);
           data = { message: rawText };
         }
       }
 
       if (!response.ok) {
-        // Jika 404, mungkin table belum wujud
-        if (response.status === 404) {
-          return { error: `Table atau endpoint '${path}' tidak dijumpai dalam Supabase.` };
-        }
-        return { error: data?.message || data?.error_description || `Ralat Pelayan ${response.status}` };
+        return { error: data?.message || `Ralat API: ${response.status}` };
       }
 
-      // Jika berjaya tapi tiada data (cth: POST 201 tanpa return representation)
       return data || { success: true };
-
     } catch (e: any) {
-      console.error("Supabase Connectivity Error:", e);
-      return { error: "RALAT RANGKAIAN: Sila semak sambungan internet atau tetapan CORS di Supabase." };
+      return { error: "Gagal menyambung ke Supabase." };
     }
   },
 
   saveUser: async (username: string, password: string, userData: any) => {
-    // Gunakan 'return=representation' untuk pastikan kita dapat data balik (elak JSON kosong)
+    if (!username) return { error: "Username diperlukan." };
     return await db.request('azmeer_users', {
       method: 'POST',
       headers: { 'Prefer': 'return=representation' },
       body: JSON.stringify({ 
-        username: username.toLowerCase().trim(), 
+        username: safeLower(username), 
         password, 
         data: userData 
       })
@@ -120,27 +106,31 @@ export const db = {
   },
 
   getUser: async (username: string) => {
-    const data = await db.request(`azmeer_users?username=eq.${username.toLowerCase().trim()}&select=*`);
+    if (!username) return null;
+    const data = await db.request(`azmeer_users?username=eq.${safeLower(username)}&select=*`);
     if (data?.error) return data;
     return Array.isArray(data) && data.length > 0 ? data[0] : null;
   },
 
   updateUser: async (username: string, userData: any) => {
-    return await db.request(`azmeer_users?username=eq.${username.toLowerCase().trim()}`, {
+    if (!username) return { error: "Username diperlukan." };
+    return await db.request(`azmeer_users?username=eq.${safeLower(username)}`, {
       method: 'PATCH',
       body: JSON.stringify({ data: userData })
     });
   },
 
   saveUuid: async (userId: string, uuid: string) => {
+    if (!userId || !uuid) return;
     return await db.request('azmeer_uuids', {
       method: 'POST',
-      body: JSON.stringify({ user_id: userId.toLowerCase().trim(), uuid: uuid })
+      body: JSON.stringify({ user_id: safeLower(userId), uuid: uuid })
     });
   },
 
   getUuids: async (userId: string) => {
-    const data = await db.request(`azmeer_uuids?user_id=eq.${userId.toLowerCase().trim()}&select=uuid`);
+    if (!userId) return [];
+    const data = await db.request(`azmeer_uuids?user_id=eq.${safeLower(userId)}&select=uuid`);
     return Array.isArray(data) ? data.map((d: any) => d.uuid) : [];
   },
 

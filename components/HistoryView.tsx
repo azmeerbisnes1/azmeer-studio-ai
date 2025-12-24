@@ -17,10 +17,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
 
   const fetchHistory = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
-    setError(null);
     
     try {
-      // 1. Dapatkan senarai UUID milik user daripada Supabase
+      // 1. Ambil semua UUID yang disimpan oleh user ini dalam Supabase
       const userUuids = await db.getUuids(user.username);
       
       if (!userUuids || userUuids.length === 0) {
@@ -29,28 +28,27 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
         return;
       }
 
-      // 2. Tarik data terperinci daripada Geminigen untuk setiap UUID tersebut
+      // 2. Dapatkan data terperinci daripada Geminigen untuk setiap UUID
       const videoDataPromises = userUuids.map(uuid => getSpecificHistory(uuid).catch(() => null));
       const rawResults = await Promise.all(videoDataPromises);
       
-      // 3. Map kepada format GeneratedVideo
       const videoItems = rawResults
         .filter(item => item !== null)
-        .map(mapToGeneratedVideo)
-        .sort((a, b) => b.timestamp - a.timestamp); // Terbaru di atas
+        .map(item => mapToGeneratedVideo(item))
+        .sort((a, b) => b.timestamp - a.timestamp);
           
       setHistory(videoItems);
 
-      // 4. Jika ada video masih 'Processing', teruskan polling
-      const isStillRendering = videoItems.some(v => v.status === 1);
+      // 3. Auto-polling jika ada video masih 'Processing' (Status 1)
+      const hasActiveTasks = videoItems.some(v => v.status === 1);
       
       if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
-      if (isStillRendering) {
+      if (hasActiveTasks) {
         pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 8000);
       }
     } catch (err: any) {
-      console.error("Vault Sync Error:", err);
-      setError(err.message || "Gagal menyelaraskan koleksi peribadi anda daripada pangkalan data.");
+      console.error("Sync Error:", err);
+      setError("Gagal menyinkronkan Arkib Video.");
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -64,49 +62,37 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
   return (
     <div className="flex-1 flex flex-col h-full bg-[#020617] p-6 md:p-12 overflow-y-auto custom-scrollbar">
       <div className="max-w-7xl mx-auto w-full">
-        <header className="mb-20 flex flex-col lg:flex-row lg:items-end justify-between gap-10 pt-10 animate-up">
+        <header className="mb-16 flex flex-col lg:flex-row lg:items-end justify-between gap-8 pt-6 animate-up">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-2.5 h-2.5 rounded-full bg-cyan-500 shadow-[0_0_12px_rgba(34,211,238,0.8)]"></div>
-              <p className="text-cyan-500 text-[10px] font-black uppercase tracking-[0.6em]">Arkib Video Peribadi: {user.username}</p>
+              <p className="text-cyan-500 text-[10px] font-black uppercase tracking-[0.5em]">Arkib Koleksi Video</p>
             </div>
-            <h2 className="text-6xl md:text-8xl font-black text-white tracking-tighter uppercase leading-none">
-              Koleksi <span className="text-slate-900 stroke-text">Video</span>
+            <h2 className="text-5xl md:text-7xl font-black text-white tracking-tighter uppercase leading-none">
+              Vault <span className="text-slate-900 stroke-text">Sora 2.0</span>
             </h2>
           </div>
           <button 
             onClick={() => fetchHistory(true)} 
             disabled={loading} 
-            className="group px-10 py-5 rounded-[2.5rem] bg-white text-slate-950 text-[11px] font-black uppercase tracking-[0.2em] hover:bg-cyan-400 hover:scale-105 active:scale-95 transition-all flex items-center gap-4 shadow-2xl disabled:opacity-50"
+            className="group px-8 py-4 rounded-2xl bg-white text-slate-950 text-[10px] font-black uppercase tracking-widest hover:bg-cyan-400 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 shadow-xl disabled:opacity-50"
           >
-            <svg className={`w-5 h-5 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            {loading ? 'MENYELARAS...' : 'SYNC ARKIB'}
+            {loading ? 'SYNCING...' : 'REFRESH ARKIB'}
           </button>
         </header>
 
         {error && (
-          <div className="bg-red-500/5 border-2 border-red-500/20 p-10 rounded-[3rem] mb-16 flex flex-col gap-6 animate-up">
-            <div className="flex items-center gap-4">
-               <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-               </div>
-               <p className="text-red-500 text-xs font-black uppercase tracking-[0.3em]">Ralat Sinkronisasi Supabase</p>
-            </div>
-            <p className="text-red-400/60 text-[11px] font-mono leading-relaxed bg-black/40 p-6 rounded-2xl border border-red-500/10">
-              {error}
-            </p>
-            <button onClick={() => fetchHistory(true)} className="w-fit px-8 py-3 bg-red-600/20 hover:bg-red-600 text-white text-[10px] font-black uppercase rounded-xl transition-all">Cuba Lagi</button>
+          <div className="mb-10 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl text-center">
+             <p className="text-red-400 text-xs font-bold uppercase tracking-widest">{error}</p>
           </div>
         )}
 
-        {history.length === 0 && !loading && !error ? (
-          <div className="text-center py-48 border-4 border-dashed border-slate-900/50 rounded-[4rem] bg-slate-900/5 animate-up">
-            <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-8">
-               <svg className="w-10 h-10 text-slate-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" /></svg>
-            </div>
-            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">Akaun anda belum menjana sebarang video.</p>
+        {history.length === 0 && !loading ? (
+          <div className="text-center py-40 border-4 border-dashed border-slate-900/50 rounded-[4rem] bg-slate-900/5 animate-up">
+            <p className="text-slate-700 font-black uppercase tracking-[0.5em] text-xs">Tiada rekod video ditemui.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 pb-40">
@@ -116,11 +102,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
           </div>
         )}
       </div>
-      
       <style>{`
-        .stroke-text {
-          -webkit-text-stroke: 1px rgba(255,255,255,0.05);
-        }
+        .stroke-text { -webkit-text-stroke: 1px rgba(255,255,255,0.05); }
       `}</style>
     </div>
   );
