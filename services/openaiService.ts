@@ -1,21 +1,39 @@
 import { refinePromptWithAI } from "./geminigenService";
 
 /**
- * Mendapatkan API Key daripada environment variable Vercel.
+ * Mendapatkan API Key OpenAI dengan sokongan pelbagai persekitaran (Vercel/Vite).
+ * Memastikan VITE_OPENAI_API_KEY dikesan dengan betul.
  */
 const getApiKey = (): string => {
-  // Vercel menyuntik environment variables ke dalam process.env
-  return (process.env.OPENAI_API_KEY || process.env.API_KEY || "").trim();
+  let key = "";
+  
+  // 1. Periksa process.env (Standard Node/Vercel backend environment)
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      key = process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY || process.env.API_KEY || "";
+    }
+  } catch (e) {}
+
+  // 2. Periksa import.meta.env (Vite frontend environment - Sangat penting untuk Vercel)
+  try {
+    // @ts-ignore
+    if (!key && typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      key = import.meta.env.VITE_OPENAI_API_KEY || import.meta.env.OPENAI_API_KEY;
+    }
+  } catch (e) {}
+
+  return (key || "").trim();
 };
 
 const fetchOpenAI = async (apiUrl: string, payload: any) => {
   const currentKey = getApiKey();
   
   if (!currentKey) {
-    throw new Error("API Key OpenAI tidak dijumpai. Sila masukkan OPENAI_API_KEY di Dashboard Vercel.");
+    throw new Error("API Key OpenAI tidak dijumpai. Pastikan anda telah menambah 'VITE_OPENAI_API_KEY' di Environment Variables Vercel dan telah melakukan 'Redeploy'.");
   }
 
-  // Menggunakan proxy untuk mengelakkan ralat CORS di browser
+  // Menggunakan proxy untuk mengelakkan ralat CORS
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
 
   try {
@@ -49,28 +67,29 @@ export const generateUGCPrompt = async (params: {
 }): Promise<string> => {
   const ctaText = params.platform === 'tiktok' ? "tekan beg kuning sekarang" : "tekan learn more untuk tahu lebih lanjut";
   
-  const characterRules = params.gender === 'female' 
-    ? "A beautiful 30-year-old Malay woman wearing a stylish modest hijab, looking clean and professional. She is friendly and charismatic." 
-    : "A handsome 30-year-old Malay man with a polite and friendly influencer look. Neatly groomed hair. STRICTLY NO earrings, NO necklaces, NO bracelets, and NO rings. Wearing modest smart-casual influencer attire (no short pants).";
+  const femaleDesc = "A beautiful 30-year-old Malay woman, wearing a clean and stylish modest hijab, looking clean and professional. Charismatic influencer look.";
+  const maleDesc = "A handsome 30-year-old Malay man, polite and well-groomed influencer style, 30s, short neat hair. STRICTLY NO earrings, NO necklaces, NO bracelets, NO rings, and NO shorts. Modest and sophisticated influencer attire.";
+  
+  const characterRules = params.gender === 'female' ? femaleDesc : maleDesc;
 
-  const systemPrompt = `You are a world-class UGC (User Generated Content) Creative Director. 
-Your goal is to write a 15-second cinematic video prompt for Sora 2.0 based on a product description.
+  const systemPrompt = `You are a world-class UGC (User Generated Content) Creative Director for Sora 2.0.
+Your goal is to write a highly detailed 15-second cinematic video prompt based on the product description provided.
 
-STRICT VIDEO STRUCTURE (15 Seconds Total):
-- 0-3s: [HOOK] Extreme close-up of the character reacting excitedly to the camera while holding the product. High-energy lighting.
-- 3-6s: [FEATURE 1] Camera angle change to a high-angle 45-degree shot. Character demonstrates the product.
-- 6-9s: [FEATURE 2] Camera angle change to a macro close-up of the product details/texture.
-- 9-12s: [EXPLANATION] Camera angle change to a medium side-profile shot. Character explains the benefit with natural gestures.
-- 12-15s: [CTA] Final camera angle change to an eye-level medium shot. Character points to the camera. ON-SCREEN TEXT (Center): "${ctaText}".
+STRUCTURE REQUIREMENTS (Total 15 Seconds):
+- DYNAMIC CAMERA: Every 3 seconds, the camera angle and visual style MUST change (Total 5 distinct segments).
+- 0-3s (Hook): Extreme close-up of the character smiling warmly at the camera, holding the product. High energy start.
+- 3-6s (Feature 1): Side view, 45-degree angle. Show character interacting with the product in a premium lifestyle setting.
+- 6-9s (Detail): Macro close-up focus on the product's high-quality texture/details. Cinematic bokeh.
+- 9-12s (Demonstration): Medium shot from a different angle. Character demonstrates a key benefit naturally.
+- 12-15s (CTA): Final camera change to a stable eye-level medium shot. Character gestures towards the screen. CTA TEXT OVERLAY in center: "${ctaText}".
 
-RULES:
-- VISUAL STYLE: Cinematic, high-end commercial quality, soft studio lighting.
+CONTENT RULES:
 - CHARACTER: ${characterRules}
-- DIALOGUE/VO: Any spoken words must be in casual "Bahasa Melayu Malaysia" (Bahasa santai/ringkas).
-- TEXT: NO subtitles or captions on screen, EXCEPT for the final CTA text at the 12-second mark.
-- CAMERA: Change angle every 3 seconds as specified.
+- DIALOGUE/VOICE: All spoken words MUST be in natural, casual "Bahasa Melayu Malaysia" (Bahasa santai & ringkas).
+- TEXT ON SCREEN: NO subtitles. ONLY the final CTA text overlay during the 12-15s segment.
+- LANGUAGE: Write the technical visual prompt in high-end cinematic English for Sora 2.0, but include the Malay dialogue in the description.
 
-Return ONLY the high-quality English prompt for Sora 2.0 that describes this entire scene sequence.`;
+Return ONLY the full cinematic prompt text for Sora 2.0.`;
 
   const payload = {
     model: "gpt-4o-mini",
@@ -89,7 +108,7 @@ export const refinePromptWithOpenAI = async (text: string): Promise<string> => {
   const payload = {
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: "You are a cinematic prompt expert. Improve the user's prompt for Sora 2.0. Focus on textures, lighting, and camera movement. Output ONLY the refined prompt in English." },
+      { role: "system", content: "You are a cinematic prompt expert. Improve the user's prompt for Sora 2.0 focusing on realistic details and lighting. Output ONLY the refined prompt in English." },
       { role: "user", content: text }
     ],
     temperature: 0.7
