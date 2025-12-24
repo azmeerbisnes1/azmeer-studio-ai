@@ -60,7 +60,7 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (activeView) {
       case AppView.SORA_STUDIO: return <SoraStudioView onViewChange={setActiveView} user={user} />;
-      case AppView.HISTORY: return <HistoryView />;
+      case AppView.HISTORY: return <HistoryView user={user} />;
       case AppView.ADMIN: return <AdminDashboard currentUser={user} />;
       default: return <SoraStudioView onViewChange={setActiveView} user={user} />;
     }
