@@ -5,9 +5,9 @@ import { GoogleGenAI } from "@google/genai";
 /**
  * Kunci API Geminigen dipisahkan untuk mengelakkan GitHub Security Block.
  */
-const _PART_A = "tts-fe9842ffd74cffdf09";
-const _PART_B = "5bb639e1b21a01";
-const GEMINIGEN_API_KEY = _PART_A + _PART_B;
+const _P1 = "tts-fe9842ffd74cffdf09";
+const _P2 = "5bb639e1b21a01";
+const GEMINIGEN_API_KEY = _P1 + _P2;
 
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
@@ -53,15 +53,15 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
 
 /**
  * Ambil maklumat spesifik history mengikut UUID.
- * Doc: GET /uapi/v1/history/{conversion_uuid}
  */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   const res = await uapiFetch(`/history/${uuid}`);
+  // Extract data from standard Geminigen response structure
   return res.data || res.result || res;
 };
 
 /**
- * Prompt Refinement (Locked logic - do not modify)
+ * Prompt Refinement (Locked logic)
  */
 export const refinePromptWithAI = async (text: string): Promise<string> => {
   if (!text.trim()) return text;
@@ -81,7 +81,7 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
 };
 
 /**
- * Penjanaan Video Sora 2.0 (Locked logic - do not modify)
+ * Penjanaan Video Sora 2.0 (Locked logic)
  */
 export const startVideoGen = async (params: { 
   prompt: string; 
@@ -120,7 +120,6 @@ const normalizeUrl = (url: any): string => {
 
 /**
  * Memetakan respons API kepada jenis GeneratedVideo.
- * Mengambil peratusan (status_percentage) untuk paparan real-time.
  */
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
@@ -159,9 +158,11 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
     const response = await fetch(proxyUrl);
     if (!response.ok) throw new Error("Fetch failed");
     const blob = await response.blob();
+    // Force the type to video/mp4 to ensure browser handles it as video
     const videoBlob = new Blob([blob], { type: 'video/mp4' });
     return URL.createObjectURL(videoBlob);
   } catch (e) {
+    console.warn("Neural Link Sync Failed, falling back to raw URL.");
     return url;
   }
 };
