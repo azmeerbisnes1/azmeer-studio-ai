@@ -1,4 +1,3 @@
-
 import { GeneratedVideo } from "../types.ts";
 import { GoogleGenAI } from "@google/genai";
 
@@ -23,7 +22,7 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
 };
 
 /**
- * Robust fetcher with CORS proxy.
+ * Robust fetcher with CORS proxy for Geminigen API calls.
  */
 export async function uapiFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
   const targetPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -96,11 +95,14 @@ export const getSpecificHistory = async (uuid: string): Promise<any> => {
 const normalizeUrl = (url: any): string => {
   if (!url || typeof url !== 'string') return "";
   let trimmed = url.trim();
-  // If it's already a full URL, return it
-  if (trimmed.startsWith('http')) return trimmed;
-  // Remove leading slash if any
+  
+  // Detection for absolute URLs (S3, R2, CDN)
+  if (trimmed.toLowerCase().startsWith('http://') || trimmed.toLowerCase().startsWith('https://')) {
+    return trimmed;
+  }
+  
+  // Fallback for relative paths from the CDN
   const cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
-  // If path is empty after cleaning
   if (!cleanPath) return "";
   return `https://cdn.geminigen.ai/${cleanPath}`;
 };
@@ -108,22 +110,17 @@ const normalizeUrl = (url: any): string => {
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
   
-  // Data detail might be at root or under .data property
+  // Handle direct item vs {data: item}
   const root = item.data || item;
   
-  // History API returns results in 'generated_video' array
+  // Extract from documentation-compliant structure
   const vList = root.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
-  // Priority for Video URL:
-  // 1. video_url from generated_video array (absolute)
-  // 2. video_uri from generated_video array (relative)
-  // 3. generate_result from root (fallback absolute/relative)
+  // API returns video_url or video_uri for the result
   let rawUrl = vData.video_url || vData.video_uri || root.generate_result || "";
   
-  // Priority for Thumbnail:
-  // 1. last_frame from generated_video (relative/absolute)
-  // 2. thumbnail_url from root (relative/absolute)
+  // Sora generations typically provide a 'last_frame' for the thumbnail
   let rawThumb = vData.last_frame || root.thumbnail_url || "";
 
   const status = root.status !== undefined ? Number(root.status) : 1;
@@ -149,7 +146,9 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
     const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
     const response = await fetch(proxyUrl);
     const blob = await response.blob();
-    return URL.createObjectURL(blob);
+    // Explicitly set MIME type to mp4 to bypass octet-stream playback issues
+    const videoBlob = new Blob([blob], { type: 'video/mp4' });
+    return URL.createObjectURL(videoBlob);
   } catch (e) {
     return url;
   }
