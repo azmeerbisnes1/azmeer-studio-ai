@@ -16,11 +16,16 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
   const pollingTimerRef = useRef<number | null>(null);
 
   const fetchHistory = useCallback(async (showLoading = true) => {
+    if (!user || !user.username) {
+      setLoading(false);
+      return;
+    }
+
     if (showLoading) setLoading(true);
     setError(null);
     
     try {
-      // 1. Ambil semua UUID yang disimpan oleh user ini dalam Supabase
+      // 1. Get all UUIDs stored for this user in Supabase
       const userUuids = await db.getUuids(user.username);
       
       if (!userUuids || userUuids.length === 0) {
@@ -29,16 +34,17 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
         return;
       }
 
-      // 2. Dapatkan data terperinci daripada Geminigen untuk setiap UUID
+      // 2. Fetch live details for each UUID from Geminigen
       const videoDataPromises = userUuids.map(uuid => 
         getSpecificHistory(uuid).catch(err => {
-          console.error(`Gagal tarik UUID ${uuid}:`, err);
+          console.error(`Failed to fetch UUID ${uuid}:`, err);
           return null;
         })
       );
       
       const rawResults = await Promise.all(videoDataPromises);
       
+      // 3. Map to UI format and sort by newest first
       const videoItems = rawResults
         .filter(item => item !== null && (item.uuid || item.id))
         .map(item => mapToGeneratedVideo(item))
@@ -46,8 +52,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
           
       setHistory(videoItems);
 
-      // 3. Auto-polling jika ada video masih 'Processing' (Status 1)
-      const hasActiveTasks = videoItems.some(v => v.status === 1);
+      // 4. Automatic Polling: If any video is still processing (Status 1)
+      const hasActiveTasks = videoItems.some(v => Number(v.status) === 1);
       
       if (pollingTimerRef.current) {
         window.clearTimeout(pollingTimerRef.current);
@@ -55,7 +61,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       }
 
       if (hasActiveTasks) {
-        pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 8000);
+        // Poll every 5 seconds for status changes
+        pollingTimerRef.current = window.setTimeout(() => fetchHistory(false), 5000);
       }
     } catch (err: any) {
       console.error("Sync Error:", err);
@@ -63,7 +70,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, [user.username]);
+  }, [user]);
 
   useEffect(() => {
     fetchHistory(true);

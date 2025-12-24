@@ -17,6 +17,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
   const isCompleted = status === 2;
   const isProcessing = status === 1;
   const isFailed = status === 3;
+  const progress = video.status_percentage || 0;
 
   useEffect(() => {
     return () => {
@@ -50,23 +51,6 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       return null;
     }
   };
-
-  useEffect(() => {
-    if (!isCompleted || internalSrc || isLoadingNeural) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          establishNeuralLink();
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (containerRef.current) observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [isCompleted, internalSrc, video.url]);
 
   const togglePlay = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -114,7 +98,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
 
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `Sora_Studio_${video.uuid.substring(0, 8)}.mp4`;
+      link.download = `Azmeer_Studio_${video.uuid.substring(0, 8)}.mp4`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -124,9 +108,10 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
       }
     } catch (err) {
       console.error("Download failed:", err);
+      // Fallback to direct link if blob fails
       window.open(video.url, '_blank');
     } finally {
-      setTimeout(() => setIsDownloading(false), 2000);
+      setIsDownloading(false);
     }
   };
 
@@ -207,7 +192,7 @@ export const VideoCard: React.FC<{ video: GeneratedVideo }> = ({ video }) => {
                 <div className="absolute inset-0 border-4 border-slate-900 rounded-full"></div>
                 <div className="absolute inset-0 border-4 border-t-cyan-500 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
                 <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-cyan-400 font-orbitron">
-                  {video.status_percentage || 0}%
+                  {progress}%
                 </div>
              </div>
              <div className="space-y-2">

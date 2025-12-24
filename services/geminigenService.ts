@@ -93,7 +93,9 @@ export const startVideoGen = async (params: {
 }
 
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
-  return await uapiFetch(`/history/${uuid}`);
+  const res = await uapiFetch(`/history/${uuid}`);
+  // The documentation shows the data can be the root object or nested in .data
+  return res.data || res.result || res;
 };
 
 const normalizeUrl = (url: any): string => {
@@ -112,18 +114,17 @@ const normalizeUrl = (url: any): string => {
 export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   if (!item) return {} as GeneratedVideo;
   
-  // Handling the specific response structure from Get Specific Generation History
   const root = item;
   const vList = root.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
   // Status: 1 (Processing), 2 (Completed), 3 (Failed)
   const status = root.status !== undefined ? Number(root.status) : 1;
-  const percentage = root.status_percentage !== undefined ? Number(root.status_percentage) : (status === 2 ? 100 : 5);
+  const percentage = root.status_percentage !== undefined ? Number(root.status_percentage) : (status === 2 ? 100 : 0);
 
   // Preference order for video URL: generated_video[0].video_url -> root.generate_result
   let rawUrl = vData.video_url || vData.video_uri || root.generate_result || "";
-  let rawThumb = vData.last_frame || vData.thumbnail || root.thumbnail_url || "";
+  let rawThumb = vData.thumbnail || vData.last_frame || root.thumbnail_url || "";
 
   return {
     mediaType: 'video',
@@ -157,7 +158,7 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
       if (!response.ok) continue;
       
       const blob = await response.blob();
-      // Ensure the blob is specifically marked as video/mp4 for browser players
+      // Ensure the blob is specifically marked as video/mp4
       const videoBlob = new Blob([blob], { type: 'video/mp4' });
       return URL.createObjectURL(videoBlob);
     } catch (e) {
