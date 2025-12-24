@@ -8,9 +8,10 @@ import { AppView, User } from '../types.ts';
 interface SoraStudioViewProps {
   onViewChange: (view: AppView) => void;
   user: User;
+  onUserUpdate?: (updatedUser: User) => void;
 }
 
-const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) => {
+const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user, onUserUpdate }) => {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
@@ -77,15 +78,18 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
         imageFile: selectedImage || undefined
       });
 
-      const uuid = res?.uuid || res?.data?.uuid || res?.result?.uuid;
+      const uuid = res?.uuid || res?.data?.uuid || res?.result?.uuid || res?.id;
       if (uuid && user?.username) {
+        // 1. Simpan UUID ke Supabase
         await db.saveUuid(user.username, uuid);
         
-        // Tolak kuota user selepas berjaya request (Kecuali Admin)
+        // 2. Tolak kuota user selepas berjaya request (Kecuali Admin)
         if (user.role !== 'admin') {
            const updatedData = { ...user, videoLimit: Math.max(0, (user.videoLimit || 0) - 1) };
            await db.updateUser(user.username, updatedData);
-           // Kemaskini local session
+           
+           // 3. Kemaskini State dalam App parent & LocalStorage
+           if (onUserUpdate) onUserUpdate(updatedData);
            localStorage.setItem('azmeer_active_user', JSON.stringify(updatedData));
         }
       }
@@ -114,7 +118,7 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
           </h2>
           <div className="flex items-center justify-center gap-4 mt-6">
              <div className="px-5 py-2 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Baki Kuota: <span className={isQuotaExhausted ? 'text-red-500' : 'text-cyan-400'}>{user.role === 'admin' ? 'UNLIMITED' : user.videoLimit}</span>
+                Baki Kuota: <span className={isQuotaExhausted ? 'text-red-500 font-black' : 'text-cyan-400 font-black'}>{user.role === 'admin' ? 'UNLIMITED' : user.videoLimit}</span>
              </div>
           </div>
         </header>
@@ -167,7 +171,7 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
           </div>
 
           <div className="lg:col-span-8 space-y-8">
-            <div className={`glass-panel p-8 md:p-12 rounded-[3.5rem] border border-white/10 relative overflow-hidden group shadow-2xl ${isQuotaExhausted ? 'border-red-500/20' : ''}`}>
+            <div className={`glass-panel p-8 md:p-12 rounded-[3.5rem] border border-white/10 relative overflow-hidden group shadow-2xl ${isQuotaExhausted ? 'border-red-500/20 shadow-red-900/10' : ''}`}>
               <div className="flex flex-col gap-8 relative z-10">
                 <div className="relative">
                   <textarea 

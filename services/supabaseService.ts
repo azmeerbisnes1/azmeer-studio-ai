@@ -1,16 +1,38 @@
 
 const getSupabaseConfig = () => {
   try {
-    // Mencari URL dan KEY daripada environment variables (Vite atau Process)
-    const url = (import.meta as any).env?.VITE_SUPABASE_URL || (typeof process !== 'undefined' ? process.env?.SUPABASE_URL : null) || "";
-    const key = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || (typeof process !== 'undefined' ? process.env?.SUPABASE_ANON_KEY : null) || "";
+    // 1. Cuba akses guna standard Vite (Paling utama untuk Vercel/Local)
+    // @ts-ignore
+    let url = import.meta.env?.VITE_SUPABASE_URL;
+    // @ts-ignore
+    let key = import.meta.env?.VITE_SUPABASE_ANON_KEY;
+
+    // 2. Fallback jika nama variable tak ada prefix VITE_ (Berguna untuk sesetengah persekitaran)
+    if (!url) {
+      // @ts-ignore
+      url = import.meta.env?.SUPABASE_URL || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL || process.env?.SUPABASE_URL : null);
+    }
+    if (!key) {
+      // @ts-ignore
+      key = import.meta.env?.SUPABASE_ANON_KEY || (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_ANON_KEY || process.env?.SUPABASE_ANON_KEY : null);
+    }
+
+    // 3. Last resort: check window object (kadangkala disuntik oleh sesetengah CI/CD)
+    if (!url && typeof window !== 'undefined') url = (window as any)._env_?.VITE_SUPABASE_URL;
+    if (!key && typeof window !== 'undefined') key = (window as any)._env_?.VITE_SUPABASE_ANON_KEY;
     
     if (!url || !key) {
-      console.warn("⚠️ AMARAN: SUPABASE_URL atau SUPABASE_ANON_KEY tidak dikesan. Sila pastikan hampa dah masukkan dalam Environment Variables atau .env file.");
+      console.error("❌ SUPABASE CONFIG MISSING: Sila pastikan VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY telah di-set dalam Vercel Environment Variables.");
+    } else {
+      console.log("✅ Supabase Configuration Detected.");
     }
     
-    return { url, key };
+    return { 
+      url: (url || "").trim(), 
+      key: (key || "").trim() 
+    };
   } catch (e) {
+    console.error("Config fetch error:", e);
     return { url: "", key: "" };
   }
 };
@@ -19,6 +41,7 @@ const { url: SUPABASE_URL, key: SUPABASE_ANON_KEY } = getSupabaseConfig();
 
 const supabaseRequest = async (path: string, options: RequestInit = {}) => {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error("Supabase request aborted: Missing credentials.");
     return null;
   }
   
@@ -38,19 +61,22 @@ const supabaseRequest = async (path: string, options: RequestInit = {}) => {
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Supabase Error (${response.status}):`, errorText);
+      console.error(`Supabase Error ${response.status}:`, errorText);
       return null;
     }
 
     if (response.status === 204) return { success: true };
     return await response.json();
   } catch (e) {
-    console.error("Network Error with Supabase:", e);
+    console.error("Supabase Network Error:", e);
     return null;
   }
 };
 
 export const db = {
+  // Check if DB is ready
+  isReady: () => !!(SUPABASE_URL && SUPABASE_ANON_KEY),
+
   // Simpan atau Kemaskini User (Register/Admin Update)
   saveUser: async (username: string, password: string, userData: any) => {
     return await supabaseRequest('azmeer_users', {

@@ -19,6 +19,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsProcessing(true);
     setError('');
 
+    // Semakan Diagnostic
+    if (!db.isReady()) {
+      setError('SISTEM OFFLINE: Environment Variables (VITE_SUPABASE_URL/KEY) tidak dikesan. Sila hubungi admin.');
+      setIsProcessing(false);
+      return;
+    }
+
     const cleanUsername = formData.username.toLowerCase().trim();
 
     // Hardcoded Admin Azmeer Credentials
@@ -55,7 +62,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             return;
           }
           
-          // Login berjaya (Sistem Lock di App.tsx akan handle skrin pending)
           onLogin(userData);
         } else {
           setError('ID Pengguna atau Kata Laluan tidak sah.');
@@ -68,6 +74,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     } else {
       try {
         const existing = await db.getUser(cleanUsername);
+        
+        // existing === null boleh bermaksud user tak wujud ATAU connection mati
+        // Jika connection mati, supabaseRequest return null.
+        // Kita assume connection okay jika db.isReady() lepas.
+        
         if (existing) { 
           setError('ID Pengguna ini sudah didaftarkan.'); 
           setIsProcessing(false); 
@@ -81,9 +92,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           username: cleanUsername, 
           password: formData.password, 
           role: 'user', 
-          status: 'pending', // Auto-lock: Mesti tunggu admin approve
+          status: 'pending',
           credits: 0, 
-          videoLimit: 0, // Had mula 0
+          videoLimit: 0, 
           azmeerLimit: 0, 
           videosGenerated: 0, 
           azmeerGenerated: 0, 
@@ -94,7 +105,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         if (res) {
           onLogin(newUser);
         } else {
-          setError('Gagal mendaftar. Sila cuba lagi.');
+          setError('Gagal mendaftar ke pangkalan data. Sila pastikan Table Table azmeer_users wujud di Supabase.');
+          setIsProcessing(false);
         }
       } catch (err) {
         setError('Pendaftaran terganggu. Sila cuba lagi.');

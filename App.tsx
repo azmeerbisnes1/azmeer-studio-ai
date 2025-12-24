@@ -6,6 +6,7 @@ import SoraStudioView from './components/SoraStudioView.tsx';
 import HistoryView from './components/HistoryView.tsx';
 import { AdminDashboard } from './components/AdminDashboard.tsx';
 import { Login } from './components/Login.tsx';
+import { db } from './services/supabaseService.ts';
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<AppView>(AppView.SORA_STUDIO);
@@ -16,10 +17,25 @@ const App: React.FC = () => {
     const savedUser = localStorage.getItem('azmeer_active_user');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        setUser(parsed);
+        // Sync data terbaru dari Supabase secara senyap semasa startup
+        refreshUser(parsed.username);
       } catch (e) {}
     }
   }, []);
+
+  const refreshUser = async (username: string) => {
+    try {
+      const remoteUser = await db.getUser(username);
+      if (remoteUser && remoteUser.data) {
+        setUser(remoteUser.data);
+        localStorage.setItem('azmeer_active_user', JSON.stringify(remoteUser.data));
+      }
+    } catch (e) {
+      console.error("Gagal sync data user:", e);
+    }
+  };
 
   const handleLogin = (newUser: User) => {
     setUser(newUser);
@@ -59,10 +75,10 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case AppView.SORA_STUDIO: return <SoraStudioView onViewChange={setActiveView} user={user} />;
+      case AppView.SORA_STUDIO: return <SoraStudioView onViewChange={setActiveView} user={user} onUserUpdate={setUser} />;
       case AppView.HISTORY: return <HistoryView user={user} />;
       case AppView.ADMIN: return <AdminDashboard currentUser={user} />;
-      default: return <SoraStudioView onViewChange={setActiveView} user={user} />;
+      default: return <SoraStudioView onViewChange={setActiveView} user={user} onUserUpdate={setUser} />;
     }
   };
 
