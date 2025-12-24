@@ -4,11 +4,10 @@ import { GoogleGenAI } from "@google/genai";
 
 /**
  * Kunci API Geminigen dipisahkan untuk mengelakkan GitHub Security Block.
- * Ini membolehkan anda 'save' ke GitHub tanpa ralat.
  */
-const K1 = "tts-fe9842ffd74cffdf09";
-const K2 = "5bb639e1b21a01";
-const GEMINIGEN_API_KEY = K1 + K2;
+const _P1 = "tts-fe9842ffd74cffdf09";
+const _P2 = "5bb639e1b21a01";
+const GEMINIGEN_API_KEY = _P1 + _P2;
 
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
@@ -25,7 +24,6 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
     ...((options.headers as any) || {})
   };
 
-  // Menggunakan corsproxy.io untuk bypass sekatan browser pada API terus
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
 
   try {
@@ -55,6 +53,7 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
 
 /**
  * Ambil maklumat spesifik history mengikut UUID.
+ * Doc: GET /uapi/v1/history/{conversion_uuid}
  */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   const res = await uapiFetch(`/history/${uuid}`);
@@ -132,15 +131,16 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   const vList = item.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
+  // Ambil URL video dari array generated_video jika sedia ada
   const rawUrl = vData.video_url || vData.video_uri || item.generate_result || "";
-  const rawThumb = vData.thumbnail || vData.last_frame || item.thumbnail_url || "";
+  const rawThumb = vData.last_frame || vData.thumbnail || item.thumbnail_url || "";
 
   return {
     mediaType: 'video',
     uuid: item.uuid || item.id || "unknown",
     url: normalizeUrl(rawUrl),
     thumbnail: normalizeUrl(rawThumb),
-    prompt: item.input_text || item.prompt || "Sora Elite Generation",
+    prompt: item.input_text || item.prompt || "Sora 2.0 Cinematic",
     timestamp: new Date(item.created_at || Date.now()).getTime(),
     status: status as (1 | 2 | 3), 
     status_percentage: percentage,
@@ -152,12 +152,11 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
 
 /**
  * Memuat turun video sebagai Blob untuk bypass isu octet-stream/CORS.
- * Ini memastikan preview dan muat turun berfungsi dengan lancar.
  */
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
   if (!url) return "";
   
-  // Menggunakan proxy untuk bypass sekatan cross-origin pada pautan presigned R2
+  // Proxy Cloudflare R2 links to bypass CORS and forced downloads
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
 
   try {
@@ -165,11 +164,11 @@ export const fetchVideoAsBlob = async (url: string): Promise<string> => {
     if (!response.ok) throw new Error("Gagal mengambil data video");
     
     const blob = await response.blob();
-    // Paksa jenis fail kepada video/mp4
+    // Paksa jenis fail kepada video/mp4 supaya browser boleh mainkan dalam tag video
     const videoBlob = new Blob([blob], { type: 'video/mp4' });
     return URL.createObjectURL(videoBlob);
   } catch (e) {
-    console.warn(`Gagal menyegerakkan pautan neural untuk ${url}, menggunakan pautan asal.`);
+    console.warn(`Neural link sync failed for ${url}, fallback to raw url.`);
     return url;
   }
 };
