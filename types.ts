@@ -5,7 +5,8 @@ export type Resolution = '720p' | '1080p';
 export enum AppView {
   SORA_STUDIO = 'SORA_STUDIO',
   HISTORY = 'HISTORY',
-  ADMIN = 'ADMIN'
+  ADMIN = 'ADMIN',
+  WEBCINEMA = 'WEBCINEMA'
 }
 
 export interface User {

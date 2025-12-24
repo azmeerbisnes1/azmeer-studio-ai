@@ -1,37 +1,60 @@
 
-const getEnvValue = (key: string): string => {
-  const viteKey = `VITE_SUPABASE_${key}`;
-  const standardKey = `SUPABASE_${key}`;
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      const val = process.env[viteKey] || process.env[standardKey];
-      if (val) return val.trim();
-    }
-  } catch (e) {}
-  try {
-    // @ts-ignore
-    const metaEnv = import.meta.env;
-    if (metaEnv) {
-      const val = metaEnv[viteKey] || metaEnv[standardKey];
-      if (val) return val.trim();
-    }
-  } catch (e) {}
+/**
+ * Fungsi pengesan env yang lebih lasak untuk pelbagai platform (Vercel, Vite, etc)
+ */
+const getEnv = (key: string): string => {
+  const variations = [
+    `VITE_SUPABASE_${key}`,
+    `SUPABASE_${key}`,
+    `NEXT_PUBLIC_SUPABASE_${key}`,
+    `REACT_APP_SUPABASE_${key}`
+  ];
+
+  for (const v of variations) {
+    try {
+      // 1. Cuba via import.meta.env (Vite standard)
+      // @ts-ignore
+      const meta = import.meta.env?.[v];
+      if (meta) return meta.trim();
+    } catch (e) {}
+
+    try {
+      // 2. Cuba via process.env (Standard node/webpack)
+      const proc = process.env?.[v];
+      if (proc) return proc.trim();
+    } catch (e) {}
+
+    try {
+      // 3. Cuba via window (Global injection)
+      const win = (window as any)._env_?.[v] || (window as any)?.[v];
+      if (win) return win.trim();
+    } catch (e) {}
+  }
   return "";
 };
 
-const SUPABASE_URL = getEnvValue('URL');
-const SUPABASE_ANON_KEY = getEnvValue('ANON_KEY');
+const SUPABASE_URL = getEnv('URL');
+const SUPABASE_ANON_KEY = getEnv('ANON_KEY');
+
+// Log Diagnostik untuk membantu pengguna di Vercel
+console.group("🔍 [DIAGNOSTIK SUPABASE]");
+console.log("URL Dikesan:", SUPABASE_URL ? "✅ ADA" : "❌ TIADA");
+console.log("Key Dikesan:", SUPABASE_ANON_KEY ? "✅ ADA" : "❌ TIADA");
+console.groupEnd();
 
 export const db = {
-  isReady: () => !!(SUPABASE_URL && SUPABASE_ANON_KEY),
-
   /**
-   * Enjin permintaan dengan diagnostik ralat yang diperkukuh
+   * Semakan status setup
    */
+  isReady: () => {
+    return !!(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith('http'));
+  },
+
   request: async (path: string, options: RequestInit = {}) => {
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      console.error("Supabase Error: URL atau API Key tiada dalam env!");
-      return { error: "Konfigurasi Env Vercel tidak lengkap." };
+    if (!db.isReady()) {
+      return { 
+        error: "SILA SEMAK VERCEL: Kod tidak dapat membaca VITE_SUPABASE_URL atau VITE_SUPABASE_ANON_KEY." 
+      };
     }
     
     const headers = {
@@ -47,29 +70,47 @@ export const db = {
       
       const response = await fetch(url, { ...options, headers });
       
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        const errorMsg = errorBody.message || await response.text();
-        
-        console.error(`%c Supabase API Error (${response.status}) %c`, "background:red;color:white", "", errorMsg);
-        
-        if (response.status === 401) return { error: "Kunci API (Anon Key) tidak sah. Sila gunakan kunci 'ey...' yang betul." };
-        if (response.status === 404) return { error: "Jadual (Table) 'azmeer_users' tidak dijumpai. Sila Run SQL di Supabase." };
-        return { error: errorMsg };
+      // Ambil respon sebagai text dahulu untuk elak ralat "Unexpected end of JSON"
+      const responseText = await response.text();
+      let responseData: any = null;
+      
+      try {
+        if (responseText) responseData = JSON.parse(responseText);
+      } catch (e) {
+        responseData = null;
       }
 
-      if (response.status === 204) return { success: true };
-      return await response.json();
+      if (!response.ok) {
+        const rawMessage = responseData?.message || responseText || "";
+
+        if (rawMessage.toLowerCase().includes("forbidden use of secret api key") || response.status === 401) {
+          return { 
+            error: "ANDA GUNA KEY SALAH: Sila tukar kepada 'Anon Key' (Public) di Vercel. Jangan guna Secret Key." 
+          };
+        }
+
+        if (response.status === 404) {
+          return { error: "JADUAL HILANG: Sila 'Run SQL' di Supabase untuk jadual 'azmeer_users'." };
+        }
+        
+        return { error: rawMessage || `Ralat Pelayan (${response.status})` };
+      }
+
+      // Jika berjaya (200, 201, 204)
+      if (response.status === 204 || !responseText) return { success: true };
+      return responseData;
     } catch (e: any) {
-      console.error("Rangkaian Supabase Gagal:", e);
-      return { error: "Tiada sambungan internet atau masalah rangkaian." };
+      console.error("Supabase Fetch Error:", e);
+      return { error: "MASALAH TEKNIKAL: Gagal menghubungi pangkalan data." };
     }
   },
 
   saveUser: async (username: string, password: string, userData: any) => {
     return await db.request('azmeer_users', {
       method: 'POST',
-      headers: { 'Prefer': 'resolution=merge-duplicates' },
+      headers: { 
+        'Prefer': 'return=representation,resolution=merge-duplicates' 
+      },
       body: JSON.stringify({ 
         username: username.toLowerCase().trim(), 
         password, 
@@ -87,7 +128,8 @@ export const db = {
 
   getUser: async (username: string) => {
     const data = await db.request(`azmeer_users?username=eq.${username.toLowerCase().trim()}&select=*`);
-    return Array.isArray(data) && data.length > 0 ? data[0] : (data?.error ? data : null);
+    if (data?.error) return data;
+    return Array.isArray(data) && data.length > 0 ? data[0] : null;
   },
 
   saveUuid: async (userId: string, uuid: string) => {

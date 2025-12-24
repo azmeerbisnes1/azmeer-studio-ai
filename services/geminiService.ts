@@ -13,7 +13,6 @@ export {
 /**
  * Unified Gemini API Client Factory
  */
-// Fix: Always use process.env.API_KEY directly in named parameter
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
@@ -32,6 +31,32 @@ export const refinePromptWithAI = async (text: string): Promise<string> => {
     return response.text?.trim() || text;
   } catch (error) {
     return text;
+  }
+};
+
+/**
+ * Website to Cinematic Prompt (Gemini 3 Pro)
+ */
+export const generateWebVideoPrompt = async (webDesc: string): Promise<string> => {
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: `Transform this website description into a masterpiece cinematic UI/UX showcase video prompt for Sora 2.0.
+      Website Description: ${webDesc}
+      
+      Requirements:
+      - Describe a futuristic, 3D landing page.
+      - Mention dynamic interactions (parallax, floating elements).
+      - Include "Cinematic 8k resolution, elegant UI design, premium typography".
+      - Describe smooth camera movements like "macro focus on glass buttons" or "smooth scroll transition".
+      - Tone: Luxury and High-Tech.
+      
+      Return ONLY the final prompt in English.`,
+    });
+    return response.text?.trim() || webDesc;
+  } catch (error) {
+    return webDesc;
   }
 };
 
@@ -64,10 +89,8 @@ export const generateUGCPrompt = async (params: {
 
 /**
  * Chat Response Generator (Gemini 3 Pro)
- * Added to resolve missing export error in ChatView.tsx
  */
 export const generateChatResponse = async (message: string): Promise<string> => {
-  // Fix: Initializing GoogleGenAI with process.env.API_KEY directly
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
@@ -78,10 +101,8 @@ export const generateChatResponse = async (message: string): Promise<string> => 
 
 /**
  * TTS Generator (Gemini 2.5 Flash TTS)
- * Added to resolve missing export error in ChatView.tsx
  */
 export const generateGeminiTTS = async (text: string): Promise<string> => {
-  // Fix: Initializing GoogleGenAI with process.env.API_KEY directly
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
@@ -100,10 +121,8 @@ export const generateGeminiTTS = async (text: string): Promise<string> => {
 
 /**
  * Image Generation (Gemini 2.5 Flash Image)
- * Added to resolve missing export error in ImageLabView.tsx
  */
 export const generateGeminiImage = async (prompt: string, aspectRatio: "1:1" | "16:9" | "9:16"): Promise<string> => {
-  // Fix: Initializing GoogleGenAI with process.env.API_KEY directly
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',

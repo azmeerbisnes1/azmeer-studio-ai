@@ -19,8 +19,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsProcessing(true);
     setError('');
 
+    // Semakan awal jika API Key belum dimasukkan di Vercel
     if (!db.isReady()) {
-      setError('Sila masukkan VITE_SUPABASE_URL & ANON_KEY di Vercel.');
+      setError('TETAPAN DIPERLUKAN: Sila masukkan VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY di bahagian Environment Variables dalam Vercel Dashboard anda.');
       setIsProcessing(false);
       return;
     }
@@ -30,29 +31,31 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     if (mode === 'login') {
       try {
         const remoteUser = await db.getUser(cleanUsername);
-        if (remoteUser && !remoteUser.error && remoteUser.password === formData.password) {
-          onLogin(remoteUser.data);
-        } else if (remoteUser && remoteUser.error) {
+        
+        if (remoteUser && remoteUser.error) {
           setError(remoteUser.error);
+        } else if (remoteUser && remoteUser.password === formData.password) {
+          onLogin(remoteUser.data);
         } else {
-          setError('ID Pengguna atau Kata Laluan salah.');
+          setError('ID Pengguna atau Kata Laluan tidak sah. Sila cuba lagi.');
         }
       } catch (err) {
-        setError('Masalah teknikal berlaku.');
+        setError('Masalah rangkaian dikesan. Sila muat semula halaman.');
       }
     } else {
       try {
         const existing = await db.getUser(cleanUsername);
-        if (existing && !existing.error) { 
-          setError('ID Pengguna sudah wujud.'); 
-          setIsProcessing(false); 
-          return; 
-        }
         
         if (existing && existing.error) {
           setError(existing.error);
           setIsProcessing(false);
           return;
+        }
+
+        if (existing) { 
+          setError('ID Pengguna ini sudah didaftarkan.'); 
+          setIsProcessing(false); 
+          return; 
         }
 
         const newUser = { 
@@ -70,10 +73,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         if (res && !res.error) {
           onLogin(newUser);
         } else {
-          setError(res?.error || 'Gagal mendaftar.');
+          setError(res?.error || 'Pendaftaran gagal. Sila pastikan database Supabase anda aktif.');
         }
       } catch (err) {
-        setError('Pendaftaran terganggu.');
+        setError('Proses pendaftaran terganggu.');
       }
     }
     setIsProcessing(false);
@@ -82,25 +85,46 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 relative overflow-hidden font-sans">
       <div className="max-w-md w-full glass-panel rounded-[3rem] p-10 text-center border-white/10 relative z-10">
-        <img src={LOGO_URL} className="w-24 h-24 mx-auto mb-8 cyber-logo-img" alt="Logo" />
-        <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-8 font-orbitron">Azmeer AI Studio</h1>
+        <div className="cyber-logo-wrapper mb-8">
+           <div className="logo-glow-ring"></div>
+           <img src={LOGO_URL} className="w-24 h-24 mx-auto cyber-logo-img" alt="Logo" />
+        </div>
+        <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-2 font-orbitron">Azmeer AI Studio</h1>
+        <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.4em] mb-8">Sora 2.0 Cinematic Portal</p>
         
-        <form onSubmit={handleAction} className="space-y-4">
+        <form onSubmit={handleAction} className="space-y-4 text-left">
           {mode === 'signup' && (
-            <input type="email" placeholder="EMAIL" required className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-xs text-white outline-none focus:border-cyan-500" onChange={e => setFormData({...formData, email: e.target.value})} />
+            <div className="space-y-1">
+              <label className="text-[8px] font-black text-slate-600 uppercase tracking-widest ml-4">Email Address</label>
+              <input type="email" placeholder="example@email.com" required className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-xs text-white outline-none focus:border-cyan-500 transition-all" onChange={e => setFormData({...formData, email: e.target.value})} />
+            </div>
           )}
-          <input type="text" placeholder="USERNAME" required className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-xs text-white outline-none focus:border-cyan-500" onChange={e => setFormData({...formData, username: e.target.value})} />
-          <input type="password" placeholder="PASSWORD" required className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-xs text-white outline-none focus:border-cyan-500" onChange={e => setFormData({...formData, password: e.target.value})} />
+          <div className="space-y-1">
+            <label className="text-[8px] font-black text-slate-600 uppercase tracking-widest ml-4">Username</label>
+            <input type="text" placeholder="ID ANDA" required className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-xs text-white outline-none focus:border-cyan-500 transition-all" onChange={e => setFormData({...formData, username: e.target.value})} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[8px] font-black text-slate-600 uppercase tracking-widest ml-4">Password</label>
+            <input type="password" placeholder="••••••••" required className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-xs text-white outline-none focus:border-cyan-500 transition-all" onChange={e => setFormData({...formData, password: e.target.value})} />
+          </div>
           
-          <button type="submit" disabled={isProcessing} className="w-full py-5 bg-cyan-600 hover:bg-cyan-500 rounded-2xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-lg">
-            {isProcessing ? 'Processing...' : mode === 'login' ? 'LOGIN' : 'SIGN UP'}
+          <button type="submit" disabled={isProcessing} className="w-full mt-4 py-5 bg-cyan-600 hover:bg-cyan-500 rounded-2xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-lg active:scale-95 disabled:opacity-50">
+            {isProcessing ? 'SEDANG DIPROSES...' : mode === 'login' ? 'LOG MASUK' : 'DAFTAR SEKARANG'}
           </button>
           
-          {error && <p className="text-[9px] text-red-500 font-bold uppercase p-4 bg-red-500/10 rounded-xl border border-red-500/20">{error}</p>}
+          {error && (
+            <div className="mt-6 p-5 bg-red-500/10 border border-red-500/20 rounded-2xl animate-up">
+               <p className="text-[10px] text-red-400 font-bold leading-relaxed">
+                 {error}
+               </p>
+            </div>
+          )}
           
-          <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-[10px] font-bold text-slate-500 uppercase hover:text-white transition-all">
-            {mode === 'login' ? 'Daftar Akaun Baru' : 'Sudah ada akaun? Log Masuk'}
-          </button>
+          <div className="text-center mt-6">
+            <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-[10px] font-bold text-slate-500 uppercase hover:text-white transition-all tracking-widest">
+              {mode === 'login' ? 'Belum ada akaun? Daftar Sini' : 'Sudah ada akaun? Log Masuk'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

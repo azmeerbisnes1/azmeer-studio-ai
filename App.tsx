@@ -4,6 +4,7 @@ import { AppView, User } from './types.ts';
 import Sidebar from './components/Sidebar.tsx';
 import SoraStudioView from './components/SoraStudioView.tsx';
 import HistoryView from './components/HistoryView.tsx';
+import WebVideoView from './components/WebVideoView.tsx';
 import { AdminDashboard } from './components/AdminDashboard.tsx';
 import { Login } from './components/Login.tsx';
 import { db } from './services/supabaseService.ts';
@@ -19,7 +20,6 @@ const App: React.FC = () => {
       try {
         const parsed = JSON.parse(savedUser);
         setUser(parsed);
-        // Sync data terbaru dari Supabase secara senyap semasa startup
         refreshUser(parsed.username);
       } catch (e) {}
     }
@@ -49,7 +49,6 @@ const App: React.FC = () => {
 
   if (!user) return <Login onLogin={handleLogin} />;
 
-  // SISTEM LOCK: Jika akaun belum approved, tunjuk paparan sekatan
   if (user.status !== 'approved' && user.role !== 'admin') {
     return (
       <div className="min-h-screen bg-[#020617] flex items-center justify-center p-8 relative overflow-hidden">
@@ -76,6 +75,7 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (activeView) {
       case AppView.SORA_STUDIO: return <SoraStudioView onViewChange={setActiveView} user={user} onUserUpdate={setUser} />;
+      case AppView.WEBCINEMA: return <WebVideoView onViewChange={setActiveView} user={user} onUserUpdate={setUser} />;
       case AppView.HISTORY: return <HistoryView user={user} />;
       case AppView.ADMIN: return <AdminDashboard currentUser={user} />;
       default: return <SoraStudioView onViewChange={setActiveView} user={user} onUserUpdate={setUser} />;
@@ -87,7 +87,6 @@ const App: React.FC = () => {
       <Sidebar activeView={activeView} onViewChange={setActiveView} user={user} />
 
       <main className="flex-1 relative flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile Header */}
         <header className="md:hidden flex flex-col bg-[#020617] border-b border-slate-800/50 z-20">
           <div className="flex items-center justify-between p-4 px-5">
             <div className="flex items-center gap-3">
@@ -106,6 +105,7 @@ const App: React.FC = () => {
           <nav className="flex px-4 pb-3 gap-2 overflow-x-auto custom-scrollbar">
             {[
               { id: AppView.SORA_STUDIO, label: 'Studio' },
+              { id: AppView.WEBCINEMA, label: 'Web' },
               { id: AppView.HISTORY, label: 'Koleksi' },
               ...(user.role === 'admin' ? [{ id: AppView.ADMIN, label: 'Admin' }] : [])
             ].map(item => (
