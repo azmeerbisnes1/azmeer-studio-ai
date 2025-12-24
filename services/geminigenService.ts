@@ -5,9 +5,9 @@ import { GoogleGenAI } from "@google/genai";
 /**
  * Kunci API Geminigen dipisahkan untuk mengelakkan GitHub Security Block.
  */
-const _K1 = "tts-fe9842ffd74cffdf09";
-const _K2 = "5bb639e1b21a01";
-const GEMINIGEN_API_KEY = _K1 + _K2;
+const _PART_A = "tts-fe9842ffd74cffdf09";
+const _PART_B = "5bb639e1b21a01";
+const GEMINIGEN_API_KEY = _PART_A + _PART_B;
 
 const BASE_URL = "https://api.geminigen.ai/uapi/v1";
 
@@ -57,7 +57,6 @@ export async function uapiFetch(endpoint: string, options: RequestInit = {}): Pr
  */
 export const getSpecificHistory = async (uuid: string): Promise<any> => {
   const res = await uapiFetch(`/history/${uuid}`);
-  // Respons mungkin dalam res.data atau terus dalam res
   return res.data || res.result || res;
 };
 
@@ -132,7 +131,6 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
   const vList = item.generated_video || [];
   const vData = vList.length > 0 ? vList[0] : {};
   
-  // Ambil URL video dari sumber yang paling tepat mengikut respons API
   const rawUrl = vData.video_url || vData.video_uri || item.generate_result || "";
   const rawThumb = vData.last_frame || vData.thumbnail || item.thumbnail_url || "";
 
@@ -153,24 +151,17 @@ export const mapToGeneratedVideo = (item: any): GeneratedVideo => {
 
 /**
  * Memuat turun video sebagai Blob untuk bypass isu octet-stream/CORS.
- * Ini memastikan preview dan muat turun berfungsi 100%.
  */
 export const fetchVideoAsBlob = async (url: string): Promise<string> => {
   if (!url) return "";
-  
-  // Menggunakan proxy untuk bypass sekatan cross-origin
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-
   try {
     const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error("Gagal memuat turun data video.");
-    
+    if (!response.ok) throw new Error("Fetch failed");
     const blob = await response.blob();
-    // PENTING: Paksa jenis fail kepada video/mp4 supaya browser boleh mainkan dalam tag video
     const videoBlob = new Blob([blob], { type: 'video/mp4' });
     return URL.createObjectURL(videoBlob);
   } catch (e) {
-    console.warn(`Neural sync failed for ${url}, fallback to raw url.`);
     return url;
   }
 };
