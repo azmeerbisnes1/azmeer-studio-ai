@@ -43,8 +43,8 @@ export interface GeneratedImage {
   url: string;
   prompt: string;
   timestamp: number;
-  style?: string;
   aspectRatio: string;
+  style?: string;
 }
 
 export interface GeneratedTTS {
@@ -53,28 +53,26 @@ export interface GeneratedTTS {
   url: string;
   prompt: string;
   timestamp: number;
-  status: 1 | 2 | 3 | string;
+  status: number | string;
   voice: string;
   speed: number;
 }
 
 export interface SoraHistoryItem {
-  id: number;
   uuid: string;
-  user_id: number;
-  model_name: string;
-  input_text: string;
-  type: string;
-  status: number;
-  status_desc: string;
-  status_percentage: number;
-  generate_result: string | null;
-  thumbnail_url: string | null;
+  status: number | string;
+  status_percentage?: number;
+  status_desc?: string;
+  model_name?: string;
   created_at: string;
-  updated_at: string | null;
+  input_text: string;
+  generated_video?: Array<{
+    video_url?: string;
+    video_uri?: string;
+  }>;
+  generate_result?: string;
 }
 
-// Added ChatMessage interface to resolve missing type error
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';

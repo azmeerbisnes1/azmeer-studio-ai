@@ -1,13 +1,14 @@
 
 import React from 'react';
-import { AppView } from '../types.ts';
+import { AppView, User } from '../types.ts';
 
 interface SidebarProps {
   activeView: AppView;
   onViewChange: (view: AppView) => void;
+  user?: User | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, user }) => {
   const logoUrl = "https://i.ibb.co/xqgH2MQ4/Untitled-design-18.png";
 
   const navItems = [
@@ -18,6 +19,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
     )},
   ];
+
+  // Tambah menu admin jika user adalah admin
+  if (user?.role === 'admin') {
+    navItems.push({ id: AppView.ADMIN, label: 'Panel Admin', icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m16-10V7a4 4 0 11-8 0v4M12 11h10m-5-5v10" /></svg>
+    )});
+  }
 
   return (
     <aside className="hidden md:flex flex-col w-72 bg-[#020617] border-r border-slate-800/50 h-full p-8">
@@ -54,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
           <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Status Sistem AI</p>
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-[9px] font-bold text-emerald-500/80 uppercase">Semua Berjalan Lancar</span>
+            <span className="text-[9px] font-bold text-emerald-500/80 uppercase">Sedia Berkhidmat</span>
           </div>
         </div>
       </div>

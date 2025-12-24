@@ -19,32 +19,87 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsProcessing(true);
     setError('');
 
-    if (formData.username === 'azmeerbisnes1' && formData.password === 'Azm93112@') {
-      const admin = { id: "admin", name: "Azmeer (Root)", email: "azmeerbisnes1@gmail.com", username: "azmeerbisnes1", role: "admin", status: "approved", credits: 99999, videoLimit: 99999, azmeerLimit: 99999, videosGenerated: 0, azmeerGenerated: 0, picture: "https://api.dicebear.com/7.x/bottts/svg?seed=azmeer", password: formData.password };
-      await db.saveUser(admin.username, admin.password, admin);
-      onLogin(admin);
+    const cleanUsername = formData.username.toLowerCase().trim();
+
+    // Hardcoded Admin Azmeer Credentials
+    if (cleanUsername === 'azmeerbisnes1' && formData.password === 'Azm93112@') {
+      const adminData = { 
+        id: "admin-root", 
+        name: "Azmeer (Root Admin)", 
+        email: "azmeerbisnes1@gmail.com", 
+        username: "azmeerbisnes1", 
+        role: "admin", 
+        status: "approved", 
+        credits: 99999, 
+        videoLimit: 99999, 
+        azmeerLimit: 99999, 
+        videosGenerated: 0, 
+        azmeerGenerated: 0, 
+        picture: "https://api.dicebear.com/7.x/bottts/svg?seed=azmeer", 
+        password: formData.password 
+      };
+      await db.saveUser(adminData.username, adminData.password, adminData);
+      onLogin(adminData);
       return;
     }
 
     if (mode === 'login') {
-      const remoteUser = await db.getUser(formData.username);
-      if (remoteUser && remoteUser.password === formData.password) {
-        onLogin(remoteUser.data);
-      } else {
-        const registry = JSON.parse(localStorage.getItem('azmeer_global_registry') || '[]');
-        const user = registry.find((u: any) => u.username === formData.username && u.password === formData.password);
-        if (user) onLogin(user); else { setError('ID atau Kunci Keselamatan salah. Sila cuba lagi.'); setIsProcessing(false); }
+      try {
+        const remoteUser = await db.getUser(cleanUsername);
+        if (remoteUser && remoteUser.password === formData.password) {
+          const userData = remoteUser.data;
+          
+          if (userData.status === 'rejected') {
+            setError('Akaun anda telah ditolak/digantung. Sila hubungi Admin Azmeer.');
+            setIsProcessing(false);
+            return;
+          }
+          
+          // Login berjaya (Sistem Lock di App.tsx akan handle skrin pending)
+          onLogin(userData);
+        } else {
+          setError('ID Pengguna atau Kata Laluan tidak sah.');
+          setIsProcessing(false);
+        }
+      } catch (err) {
+        setError('Ralat sambungan database. Sila cuba lagi.');
+        setIsProcessing(false);
       }
     } else {
-      const existing = await db.getUser(formData.username);
-      if (existing) { setError('Nama pengguna ini sudah ada. Sila pilih nama lain.'); setIsProcessing(false); return; }
-      
-      const newUser = { id: Math.random().toString(36).substr(2, 9), name: formData.username, email: formData.email, username: formData.username, password: formData.password, role: 'user', status: 'pending', credits: 100, videoLimit: 0, azmeerLimit: 0, videosGenerated: 0, azmeerGenerated: 0, picture: `https://api.dicebear.com/7.x/identicon/svg?seed=${formData.username}` };
-      await db.saveUser(newUser.username, newUser.password, newUser);
-      const registry = JSON.parse(localStorage.getItem('azmeer_global_registry') || '[]');
-      registry.push(newUser);
-      localStorage.setItem('azmeer_global_registry', JSON.stringify(registry));
-      onLogin(newUser);
+      try {
+        const existing = await db.getUser(cleanUsername);
+        if (existing) { 
+          setError('ID Pengguna ini sudah didaftarkan.'); 
+          setIsProcessing(false); 
+          return; 
+        }
+        
+        const newUser = { 
+          id: Math.random().toString(36).substr(2, 9), 
+          name: formData.username, 
+          email: formData.email, 
+          username: cleanUsername, 
+          password: formData.password, 
+          role: 'user', 
+          status: 'pending', // Auto-lock: Mesti tunggu admin approve
+          credits: 0, 
+          videoLimit: 0, // Had mula 0
+          azmeerLimit: 0, 
+          videosGenerated: 0, 
+          azmeerGenerated: 0, 
+          picture: `https://api.dicebear.com/7.x/identicon/svg?seed=${cleanUsername}` 
+        };
+        
+        const res = await db.saveUser(newUser.username, newUser.password, newUser);
+        if (res) {
+          onLogin(newUser);
+        } else {
+          setError('Gagal mendaftar. Sila cuba lagi.');
+        }
+      } catch (err) {
+        setError('Pendaftaran terganggu. Sila cuba lagi.');
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -69,7 +124,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             {isProcessing ? <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin"></div> : <span>Masuk Sekarang</span>}
           </button>
           {error && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest bg-red-500/10 py-4 rounded-xl border border-red-500/20 mt-6">{error}</p>}
-          <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-[10px] font-black text-slate-500 uppercase mt-10 block mx-auto hover:text-white transition-all tracking-[0.3em] hover:scale-105">{mode === 'login' ? 'Daftar Akaun Baru' : 'Kembali ke Log Masuk'}</button>
+          <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className="text-[10px] font-black text-slate-500 uppercase mt-10 block mx-auto hover:text-white transition-all tracking-[0.3em] hover:scale-105">{mode === 'login' ? 'Daftar Akaun Baru' : 'Log Masuk Sedia Ada'}</button>
         </form>
         <div className="mt-16 pt-8 border-t border-white/5 opacity-20"><p className="text-[8px] font-mono text-slate-400">SAMBUNGAN SELAMAT & TERENKRIPSI</p></div>
       </div>

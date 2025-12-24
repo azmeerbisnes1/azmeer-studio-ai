@@ -4,6 +4,7 @@ import { AppView, User } from './types.ts';
 import Sidebar from './components/Sidebar.tsx';
 import SoraStudioView from './components/SoraStudioView.tsx';
 import HistoryView from './components/HistoryView.tsx';
+import { AdminDashboard } from './components/AdminDashboard.tsx';
 import { Login } from './components/Login.tsx';
 
 const App: React.FC = () => {
@@ -32,17 +33,42 @@ const App: React.FC = () => {
 
   if (!user) return <Login onLogin={handleLogin} />;
 
+  // SISTEM LOCK: Jika akaun belum approved, tunjuk paparan sekatan
+  if (user.status !== 'approved' && user.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-8 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #1e293b 1px, transparent 0)', backgroundSize: '32px 32px' }}></div>
+        <div className="max-w-xl w-full glass-panel rounded-[4rem] p-12 sm:p-20 text-center border-amber-500/20 relative z-10 animate-up">
+           <div className="w-24 h-24 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-10 border border-amber-500/30">
+              <svg className="w-10 h-10 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m4-6a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+           </div>
+           <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">Akses Disekat</h2>
+           <p className="text-slate-400 text-sm leading-relaxed mb-10">
+              Hai <span className="text-cyan-400 font-bold">{user.username}</span>, akaun anda sedang dalam proses semakan oleh <span className="text-white font-bold">Admin Azmeer</span>. Sila tunggu sehingga akaun anda disahkan untuk mula menggunakan studio.
+           </p>
+           <div className="space-y-4">
+              <div className="bg-amber-500/5 border border-amber-500/10 p-5 rounded-2xl">
+                 <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Status: Menunggu Kelulusan</p>
+              </div>
+              <button onClick={handleLogout} className="w-full py-5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-all">Log Keluar</button>
+           </div>
+        </div>
+      </div>
+    );
+  }
+
   const renderView = () => {
     switch (activeView) {
       case AppView.SORA_STUDIO: return <SoraStudioView onViewChange={setActiveView} user={user} />;
       case AppView.HISTORY: return <HistoryView />;
+      case AppView.ADMIN: return <AdminDashboard currentUser={user} />;
       default: return <SoraStudioView onViewChange={setActiveView} user={user} />;
     }
   };
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-[#020617] text-slate-200 overflow-hidden font-sans">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} />
+      <Sidebar activeView={activeView} onViewChange={setActiveView} user={user} />
 
       <main className="flex-1 relative flex flex-col min-w-0 overflow-hidden">
         {/* Mobile Header */}
@@ -64,7 +90,8 @@ const App: React.FC = () => {
           <nav className="flex px-4 pb-3 gap-2 overflow-x-auto custom-scrollbar">
             {[
               { id: AppView.SORA_STUDIO, label: 'Studio' },
-              { id: AppView.HISTORY, label: 'Vault' }
+              { id: AppView.HISTORY, label: 'Koleksi' },
+              ...(user.role === 'admin' ? [{ id: AppView.ADMIN, label: 'Admin' }] : [])
             ].map(item => (
               <button 
                 key={item.id}

@@ -1,13 +1,13 @@
 
 import React, { useState, useRef } from 'react';
-import { startVideoGen, getSpecificHistory, fetchVideoAsBlob } from '../services/geminigenService.ts';
+import { startVideoGen } from '../services/geminigenService.ts';
 import { generateUGCPrompt, refinePromptWithAI } from '../services/geminiService.ts';
 import { db } from '../services/supabaseService.ts';
-import { AppView } from '../types.ts';
+import { AppView, User } from '../types.ts';
 
 interface SoraStudioViewProps {
   onViewChange: (view: AppView) => void;
-  user?: any;
+  user: User;
 }
 
 const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) => {
@@ -24,6 +24,9 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Kunci Kuota: Jika bukan admin dan limit <= 0
+  const isQuotaExhausted = user.role !== 'admin' && (user.videoLimit || 0) <= 0;
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -35,7 +38,7 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
   };
 
   const handleUGCWizard = async () => {
-    if (!prompt.trim() || isRefining) return;
+    if (!prompt.trim() || isRefining || isQuotaExhausted) return;
     setIsRefining(true);
     try {
       const wizardResult = await generateUGCPrompt({
@@ -52,7 +55,7 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
   };
 
   const handleMagicRefine = async () => {
-    if (!prompt.trim() || isRefining) return;
+    if (!prompt.trim() || isRefining || isQuotaExhausted) return;
     setIsRefining(true);
     try {
       const refined = await refinePromptWithAI(prompt);
@@ -63,7 +66,7 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
   };
 
   const handleGenerate = async () => {
-    if (!prompt) return;
+    if (!prompt || isQuotaExhausted) return;
     setIsGenerating(true);
     try {
       const res = await startVideoGen({
@@ -75,7 +78,17 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
       });
 
       const uuid = res?.uuid || res?.data?.uuid || res?.result?.uuid;
-      if (uuid && user?.username) await db.saveUuid(user.username, uuid);
+      if (uuid && user?.username) {
+        await db.saveUuid(user.username, uuid);
+        
+        // Tolak kuota user selepas berjaya request (Kecuali Admin)
+        if (user.role !== 'admin') {
+           const updatedData = { ...user, videoLimit: Math.max(0, (user.videoLimit || 0) - 1) };
+           await db.updateUser(user.username, updatedData);
+           // Kemaskini local session
+           localStorage.setItem('azmeer_active_user', JSON.stringify(updatedData));
+        }
+      }
 
       setPrompt('');
       setSelectedImage(null);
@@ -99,19 +112,20 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
           <h2 className="text-6xl md:text-8xl font-black text-white tracking-tighter uppercase leading-none">
             Jadikan Imaginasi <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">Realiti</span>
           </h2>
-          <p className="text-slate-500 text-sm md:text-xl max-w-2xl mx-auto font-medium opacity-80 leading-relaxed">
-            Hampa taip apa saja video yang hampa nak, biar AI kami buatkan dalam sekelip mata.
-          </p>
+          <div className="flex items-center justify-center gap-4 mt-6">
+             <div className="px-5 py-2 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Baki Kuota: <span className={isQuotaExhausted ? 'text-red-500' : 'text-cyan-400'}>{user.role === 'admin' ? 'UNLIMITED' : user.videoLimit}</span>
+             </div>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <div className="lg:col-span-4 space-y-6">
-            <div className="glass-panel p-8 rounded-[2.5rem] border border-white/5 space-y-6">
+            <div className={`glass-panel p-8 rounded-[2.5rem] border border-white/5 space-y-6 ${isQuotaExhausted ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
               <h3 className="text-[11px] font-black text-cyan-500 uppercase tracking-[0.3em] flex items-center gap-2">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" /></svg>
                 Bantu Saya Buat Skrip UGC
               </h3>
-              
               <div className="space-y-4">
                 <div className="space-y-2">
                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Karakter</label>
@@ -128,13 +142,12 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
                    </select>
                 </div>
               </div>
-
-              <button onClick={handleUGCWizard} disabled={isRefining || !prompt} className="w-full py-4 bg-cyan-600/10 border border-cyan-500/30 text-cyan-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-600 hover:text-white transition-all">
+              <button onClick={handleUGCWizard} disabled={isRefining || !prompt || isQuotaExhausted} className="w-full py-4 bg-cyan-600/10 border border-cyan-500/30 text-cyan-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-600 hover:text-white transition-all">
                 {isRefining ? 'Tengah Fikir Skrip...' : 'Jana Skrip Power'}
               </button>
             </div>
 
-            <div className="glass-panel p-8 rounded-[2.5rem] border border-white/5 space-y-6">
+            <div className={`glass-panel p-8 rounded-[2.5rem] border border-white/5 space-y-6 ${isQuotaExhausted ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
                <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.3em]">Tetapan Masa & Saiz</h3>
                <div className="grid grid-cols-2 gap-4">
                   {[10, 15].map(d => (
@@ -154,21 +167,24 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
           </div>
 
           <div className="lg:col-span-8 space-y-8">
-            <div className="glass-panel p-8 md:p-12 rounded-[3.5rem] border border-white/10 relative overflow-hidden group shadow-2xl">
+            <div className={`glass-panel p-8 md:p-12 rounded-[3.5rem] border border-white/10 relative overflow-hidden group shadow-2xl ${isQuotaExhausted ? 'border-red-500/20' : ''}`}>
               <div className="flex flex-col gap-8 relative z-10">
                 <div className="relative">
                   <textarea 
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Cerita sikit video apa yang hampa nak buat kat sini..."
-                    className="w-full bg-transparent border-none outline-none text-2xl md:text-4xl font-black placeholder:text-slate-800 text-white resize-none min-h-[250px] leading-tight custom-scrollbar"
+                    disabled={isQuotaExhausted}
+                    placeholder={isQuotaExhausted ? "Kuota hampa dah habis. Sila hubungi Admin Azmeer untuk tambah." : "Cerita sikit video apa yang hampa nak buat kat sini..."}
+                    className="w-full bg-transparent border-none outline-none text-2xl md:text-4xl font-black placeholder:text-slate-800 text-white resize-none min-h-[250px] leading-tight custom-scrollbar disabled:opacity-30"
                   />
-                  <div className="flex justify-end mt-4">
-                    <button onClick={handleMagicRefine} disabled={!prompt.trim() || isRefining} className="flex items-center gap-3 px-6 py-3 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 rounded-2xl transition-all disabled:opacity-30 group/btn">
-                      {isRefining ? <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" /> : <svg className="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 24 24"><path d="M7.5 5.6L10 7L8.6 4.5L10 2L7.5 3.4L5 2L6.4 4.5L5 7L7.5 5.6ZM19.5 15.4L17 14L18.4 16.5L17 19L19.5 17.6L22 19L20.6 16.5L22 14L19.5 15.4ZM22 2L19.5 3.4L17 2L18.4 4.5L17 7L19.5 5.6L22 7L20.6 4.5L22 2ZM14.3 5.4L4.7 15L9 19.3L18.6 9.7L14.3 5.4ZM17.1 6.9L14.3 4L13.1 5.2L15.9 8.1L17.1 6.9Z" /></svg>}
-                      <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Cantikkan Skrip</span>
-                    </button>
-                  </div>
+                  {!isQuotaExhausted && (
+                    <div className="flex justify-end mt-4">
+                      <button onClick={handleMagicRefine} disabled={!prompt.trim() || isRefining} className="flex items-center gap-3 px-6 py-3 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 rounded-2xl transition-all disabled:opacity-30 group/btn">
+                        {isRefining ? <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" /> : <svg className="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 24 24"><path d="M7.5 5.6L10 7L8.6 4.5L10 2L7.5 3.4L5 2L6.4 4.5L5 7L7.5 5.6ZM19.5 15.4L17 14L18.4 16.5L17 19L19.5 17.6L22 19L20.6 16.5L22 14L19.5 15.4ZM22 2L19.5 3.4L17 2L18.4 4.5L17 7L19.5 5.6L22 7L20.6 4.5L22 2ZM14.3 5.4L4.7 15L9 19.3L18.6 9.7L14.3 5.4ZM17.1 6.9L14.3 4L13.1 5.2L15.9 8.1L17.1 6.9Z" /></svg>}
+                        <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Cantikkan Skrip</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {imagePreview && (
@@ -182,21 +198,23 @@ const SoraStudioView: React.FC<SoraStudioViewProps> = ({ onViewChange, user }) =
 
                 <div className="flex flex-col md:flex-row items-stretch md:items-center gap-6 pt-8 border-t border-white/5">
                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-                  <button onClick={() => fileInputRef.current?.click()} className={`h-20 px-10 rounded-[2rem] border-2 flex items-center justify-center transition-all ${selectedImage ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-slate-500 hover:text-white'}`}>
+                  <button onClick={() => fileInputRef.current?.click()} disabled={isQuotaExhausted} className={`h-20 px-10 rounded-[2rem] border-2 flex items-center justify-center transition-all ${isQuotaExhausted ? 'bg-white/5 border-white/5 text-slate-800' : (selectedImage ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-slate-500 hover:text-white')}`}>
                     <svg className="w-6 h-6 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" strokeWidth={2}/></svg>
-                    <span className="text-[10px] font-black uppercase tracking-widest">{selectedImage ? 'GAMBAR DIKESAN' : 'GUNA GAMBAR RUJUKAN'}</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">{selectedImage ? 'GAMBAR DIKESAN' : 'GAMBAR RUJUKAN'}</span>
                   </button>
 
                   <button 
                     onClick={handleGenerate}
-                    disabled={isGenerating || !prompt}
-                    className="flex-1 h-20 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.4em] shadow-xl transition-all disabled:opacity-50 active:scale-95 flex items-center justify-center gap-4 group/gen"
+                    disabled={isGenerating || !prompt || isQuotaExhausted}
+                    className={`flex-1 h-20 rounded-[2rem] text-[11px] font-black uppercase tracking-[0.4em] shadow-xl transition-all flex items-center justify-center gap-4 group/gen ${isQuotaExhausted ? 'bg-red-900/20 text-red-500 border border-red-500/20 cursor-not-allowed' : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white disabled:opacity-50 active:scale-95'}`}
                   >
                     {isGenerating ? (
                       <>
                         <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
                         <span>TENGAH SIAPKAN...</span>
                       </>
+                    ) : isQuotaExhausted ? (
+                      <span>KUOTA HABIS</span>
                     ) : (
                       <>
                         <span>Mula Buat Video</span>
