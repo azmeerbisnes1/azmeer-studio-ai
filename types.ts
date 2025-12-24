@@ -1,7 +1,12 @@
 
 export type AspectRatio = '16:9' | '9:16' | '1:1';
 export type Resolution = '720p' | '1080p';
-export type EngineType = 'SORA' | 'ARCHIVE' | 'ADMIN';
+
+export enum AppView {
+  SORA_STUDIO = 'SORA_STUDIO',
+  HISTORY = 'HISTORY',
+  ADMIN = 'ADMIN'
+}
 
 export interface User {
   id: string;
@@ -37,31 +42,42 @@ export interface GeneratedImage {
   uuid: string;
   url: string;
   prompt: string;
+  timestamp: number;
   style?: string;
   aspectRatio: string;
-  timestamp: number;
-  status?: number | string;
 }
 
 export interface GeneratedTTS {
   mediaType: 'tts';
   uuid: string;
-  prompt: string;
-  status: number | string;
   url: string;
+  prompt: string;
+  timestamp: number;
+  status: 1 | 2 | 3 | string;
   voice: string;
   speed: number;
-  timestamp: number;
 }
 
-export type HistoryItem = GeneratedVideo | GeneratedImage | GeneratedTTS;
+export interface SoraHistoryItem {
+  id: number;
+  uuid: string;
+  user_id: number;
+  model_name: string;
+  input_text: string;
+  type: string;
+  status: number;
+  status_desc: string;
+  status_percentage: number;
+  generate_result: string | null;
+  thumbnail_url: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
 
-export interface AppState {
-  activeTab: EngineType;
-  isGenerating: boolean;
-  isRefining: boolean;
-  history: HistoryItem[];
-  error: string | null;
-  success: string | null;
-  loadingMessage: string;
+// Added ChatMessage interface to resolve missing type error
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  content: string;
+  timestamp: number;
 }

@@ -1,7 +1,8 @@
 {
-  "name": "Azmeer AI Studio",
-  "description": "Platform penjanaan video berkuasa tinggi melalui kluster Azmeer AI Studio UAPI.",
+  "name": "azmeer ai studio",
+  "description": "Premium Sora 2.0 Cinematic Generator and Neural Archive.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone"
   ]
 }

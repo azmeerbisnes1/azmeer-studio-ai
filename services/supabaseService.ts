@@ -16,7 +16,6 @@ const { url: SUPABASE_URL, key: SUPABASE_ANON_KEY } = getSupabaseConfig();
  */
 const supabaseRequest = async (path: string, options: RequestInit = {}) => {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.warn("SUPABASE_CONFIG_MISSING: Sila set URL dan ANON_KEY di persekitaran hosting anda.");
     return null;
   }
   
@@ -35,15 +34,12 @@ const supabaseRequest = async (path: string, options: RequestInit = {}) => {
     });
     
     if (!response.ok) {
-      const errText = await response.text();
-      console.error(`SUPABASE_API_ERROR [${response.status}]:`, errText);
       return null;
     }
 
     if (response.status === 204) return { success: true };
     return await response.json();
   } catch (e) {
-    console.error("SUPABASE_CONNECTION_ERROR:", e);
     return null;
   }
 };
